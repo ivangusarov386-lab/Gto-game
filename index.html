@@ -880,7 +880,8 @@ function spawnDust(count, burst){
 function updatePlayerPhysics(dt){
   // duck only while grounded
   if(player.grounded && Input.ducking && screenState==='playing'){
-    if(player.state !== 'duck') Snd.duck();
+    if(player.state !== 'duck'){ Snd.duck(); duckPoseT = 0; }
+    else duckPoseT += dt;
     player.state = 'duck';
   } else if(player.grounded){
     player.state = 'run';
@@ -902,6 +903,7 @@ function updatePlayerPhysics(dt){
       player.vy = 0;
       player.grounded = true;
       player.state = Input.ducking ? 'duck' : 'run';
+      if(Input.ducking) duckPoseT = 0;
       Snd.land();
       landSquashT = 0.15;
       spawnDust(6, true);
@@ -1255,14 +1257,70 @@ function drawPowerup(p){
   ctx.restore();
 }
 
+/* ---------- tiger sprites ---------- */
+const SPRITE_SCALE = 0.155;
+const SPRITE_FILES = {
+  run: ['sprites/run_1.png'],
+  jump: ['sprites/jump_1.png', 'sprites/jump_2.png', 'sprites/jump_3.png'],
+  duck: ['sprites/duck_1.png', 'sprites/duck_2.png'],
+  stumble: ['sprites/stumble_1.png', 'sprites/stumble_2.png', 'sprites/stumble_3.png', 'sprites/stumble_4.png'],
+  idle: ['sprites/idle_1.png', 'sprites/idle_2.png', 'sprites/idle_3.png'],
+};
+const SPRITES = {};
+let spritesReady = false;
+function loadSprites(){
+  const promises = [];
+  for(const name in SPRITE_FILES){
+    SPRITES[name] = SPRITE_FILES[name].map(src=>{
+      const img = new Image();
+      const entry = {img, w:0, h:0};
+      promises.push(new Promise(res=>{
+        img.onload = ()=>{ entry.w = img.naturalWidth; entry.h = img.naturalHeight; res(); };
+        img.onerror = res; // don't block the game forever if one file 404s
+      }));
+      img.src = src;
+      return entry;
+    });
+  }
+  return Promise.all(promises).then(()=>{ spritesReady = true; });
+}
+
+let duckPoseT = 0;
+
 function drawTiger(cx, groundScreenY, state, animT, footY, skins){
+  if(!spritesReady) return;
+
+  let list = SPRITES.run, idx = 0;
+  if(state==='jump'){
+    list = SPRITES.jump;
+    idx = player.vy < -100 ? 0 : (player.vy > 100 ? 2 : 1);
+  } else if(state==='duck'){
+    list = SPRITES.duck;
+    idx = duckPoseT < 0.08 ? 0 : 1;
+  } else if(state==='stumble'){
+    list = SPRITES.stumble;
+    const p = 1 - stumbleTimer/STUMBLE_TIME;
+    idx = Math.min(3, Math.max(0, Math.floor(p*4)));
+  } else if(state==='idle'){
+    list = SPRITES.idle;
+    const tm = animT % 4;
+    idx = tm < 0.15 ? 1 : (tm>=2 && tm<2.2 ? 2 : 0);
+  }
+  const spr = list[idx];
+  if(!spr || !spr.w) return;
+
+  // single running frame, so fake a little life with a subtle bob/tilt
+  const bob = state==='run' ? Math.sin(animT*13)*1.6 : 0;
+  const tilt = state==='run' ? Math.sin(animT*13)*0.035 : 0;
+  const squash = (state==='run' && landSquashT>0) ? 1-(landSquashT/0.15)*0.12 : 1;
+
   ctx.save();
-  ctx.translate(cx, groundScreenY - footY);
+  ctx.translate(cx, groundScreenY - footY + bob);
 
   // shadow (soft radial falloff, squished into an ellipse)
   const shrink = Math.max(0.35, 1 - footY/90);
   ctx.save();
-  ctx.translate(0, footY);
+  ctx.translate(0, footY - bob);
   ctx.scale(1, 0.25);
   const shadowGrad = ctx.createRadialGradient(0,0,0,0,0,16*shrink);
   shadowGrad.addColorStop(0, 'rgba(0,0,0,0.38)');
@@ -1273,125 +1331,18 @@ function drawTiger(cx, groundScreenY, state, animT, footY, skins){
   ctx.fill();
   ctx.restore();
 
-  let rot = 0;
-  let squash = 1;
-  let headDrop = 0;
-  let legPhase = Math.sin(animT*13);
-  let armPhase = -legPhase;
+  ctx.rotate(tilt);
+  ctx.scale(1, squash);
 
-  if(state==='duck'){
-    squash = 0.55;
-    headDrop = 6;
-  } else if(state==='jump'){
-    legPhase = 0.6; armPhase=-0.4;
-  } else if(state==='stumble'){
-    rot = -0.55;
-    headDrop = 2;
-  }
-
-  if((state==='run' || state==='duck') && landSquashT>0){
-    squash *= (1 - (landSquashT/0.15)*0.25);
-  }
-
-  ctx.rotate(rot);
-  const bodyTop = -34*squash;
-  const hipY = -14*squash;
-
-  // tail
-  ctx.save();
-  ctx.translate(-11, bodyTop+10);
-  ctx.rotate(-0.5 + Math.sin(animT*6)*0.2);
-  block(0,0,4,16,'#e8912e',2);
-  block(-1,14,6,4,'#1a1008',2);
-  ctx.restore();
-
-  // back leg
-  drawLeg(6, hipY, legPhase*-1, state);
-  // back arm
-  drawArm(9, bodyTop+6, armPhase*-1, state);
-
-  // shorts
-  blockGrad(-11, hipY-6, 22, 10, '#4a86e8', '#2f6fd1', 5);
-  block(-11, hipY+2, 22, 3, '#234f9c', 2);
-
-  // torso (shirt)
-  blockGrad(-11, bodyTop, 22, 22, '#ef5b46', '#d43322', 8);
-  block(-11, bodyTop+16, 22, 4, '#b32c1d', 2);
-  // shirt stripe (number) - subtle
-  block(-3, bodyTop+4, 6, 10, 'rgba(255,255,255,0.13)', 3);
-
-  // front arm
-  drawArm(-9, bodyTop+6, armPhase, state);
-  // front leg
-  drawLeg(-6, hipY, legPhase, state);
-
-  // head
-  const headY = bodyTop - 20 + headDrop;
-  blockGrad(-13, headY, 26, 22, '#ffab52', '#e8842a', 10); // main head
-  block(-13, headY+15, 26, 7, '#d97e10', 6); // chin shade
-  // ears
-  block(-13, headY-6, 8, 8, '#f2941e', 4);
-  block(12, headY-6, 8, 8, '#f2941e', 4);
-  block(-11, headY-6, 4, 4, '#1a1008', 2);
-  block(14, headY-6, 4, 4, '#1a1008', 2);
-  // stripes
-  block(-13, headY+2, 8, 3, '#1a1008', 1.5);
-  block(6, headY+2, 8, 3, '#1a1008', 1.5);
-  block(-4, headY-2, 4, 3, '#1a1008', 1.5);
-  // muzzle
-  block(-8, headY+9, 16, 10, '#fff6e0', 5);
-  // nose
-  block(-2, headY+9, 4, 3, '#3b2412', 1.5);
-  // eyes
-  if(state==='stumble'){
-    ctx.strokeStyle='#1a1008'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(-8,headY+4); ctx.lineTo(-4,headY+8); ctx.moveTo(-4,headY+4); ctx.lineTo(-8,headY+8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(4,headY+4); ctx.lineTo(8,headY+8); ctx.moveTo(8,headY+4); ctx.lineTo(4,headY+8); ctx.stroke();
-  } else {
-    block(-8, headY+4, 5, 5, '#fff');
-    block(5, headY+4, 5, 5, '#fff');
-    block(-6, headY+5, 3, 3, '#1a1008');
-    block(7, headY+5, 3, 3, '#1a1008');
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath(); ctx.arc(-6.6, headY+5.4, 0.7, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(6.4, headY+5.4, 0.7, 0, Math.PI*2); ctx.fill();
-
-    // eyebrows: tilt communicates mood per state
-    let browTilt = 0.8;
-    if(state==='jump') browTilt = 2.2;
-    else if(state==='duck') browTilt = -1.4;
-    ctx.strokeStyle = '#3b2412';
-    ctx.lineWidth = 1.4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-9, headY+1+browTilt*0.4); ctx.lineTo(-4, headY+1-browTilt*0.4);
-    ctx.moveTo(4, headY+1-browTilt*0.4); ctx.lineTo(9, headY+1+browTilt*0.4);
-    ctx.stroke();
-
-    // smile
-    ctx.strokeStyle = '#3b2412';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(-3, headY+14);
-    ctx.quadraticCurveTo(0, headY+17, 3, headY+14);
-    ctx.stroke();
-  }
-
-  // accessories
-  if(skins.headband){
-    block(-13, headY+1, 26, 4, '#e2402c');
-  }
-  if(skins.cap){
-    block(-14, headY-9, 28, 8, '#2f6fd1');
-    block(-14, headY-2, 16, 4, '#2f6fd1');
-  }
+  const w = spr.w*SPRITE_SCALE, h = spr.h*SPRITE_SCALE;
+  const auraY = -h*0.55;
 
   if(shieldActive){
     ctx.strokeStyle = 'rgba(120,180,255,'+(0.55+Math.sin(t*6)*0.15)+')';
     ctx.lineWidth = 2;
     ctx.fillStyle = 'rgba(140,190,255,0.12)';
     ctx.beginPath();
-    ctx.ellipse(0, bodyTop-2, 23, 35, 0, 0, Math.PI*2);
+    ctx.ellipse(0, auraY, w*0.62, h*0.58, 0, 0, Math.PI*2);
     ctx.fill();
     ctx.stroke();
   }
@@ -1401,23 +1352,15 @@ function drawTiger(cx, groundScreenY, state, animT, footY, skins){
       ctx.strokeStyle = '#ffd23f';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(0, bodyTop-2, 21+i*4, 32+i*5, 0, 0, Math.PI*2);
+      ctx.ellipse(0, auraY, w*(0.56+i*0.08), h*(0.52+i*0.09), 0, 0, Math.PI*2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
 
+  ctx.drawImage(spr.img, -w/2, -h, w, h);
+
   ctx.restore();
-}
-function drawLeg(x, hipY, phase, state){
-  const len = state==='duck' ? 8 : (10 + phase*6);
-  const shoeColor = window.__equippedSneakers ? '#ffd23f' : '#ffffff';
-  block(x-4, hipY, 8, Math.max(6,len), '#f2941e');
-  block(x-4, hipY+Math.max(6,len), 8, 5, shoeColor);
-}
-function drawArm(x, y, phase, state){
-  const len = 14 + phase*4;
-  block(x-3, y, 6, len, '#f2941e');
 }
 
 /* ---------- render loop ---------- */
@@ -1437,9 +1380,8 @@ function render(){
     headband: save.equipped.headband,
     cap: save.equipped.cap,
   };
-  window.__equippedSneakers = save.equipped.sneakers;
 
-  const drawState = screenState==='menu' ? 'run' : player.state;
+  const drawState = screenState==='menu' ? 'idle' : player.state;
   const animT = screenState==='menu' ? performance.now()/1000 : player.animT;
   const footY = screenState==='menu' ? 0 : player.footY;
   drawTiger(PLAYER_X, GROUND_Y, drawState, animT, footY, skins);
@@ -1473,6 +1415,7 @@ function loop(ts){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+loadSprites();
 
 /* ---------- HUD ---------- */
 const hudEl = document.getElementById('hud');
