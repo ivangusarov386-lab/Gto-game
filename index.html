@@ -1260,7 +1260,7 @@ function drawPowerup(p){
 /* ---------- tiger sprites ---------- */
 const SPRITE_SCALE = 0.155;
 const SPRITE_FILES = {
-  run: ['sprites/run_1.png', 'sprites/run_2.png'],
+  run: ['sprites/run_1.png', 'sprites/run_3.png', 'sprites/run_2.png'],
   jump: ['sprites/jump_1.png', 'sprites/jump_2.png', 'sprites/jump_3.png'],
   duck: ['sprites/duck_1.png', 'sprites/duck_2.png'],
   stumble: ['sprites/stumble_1.png', 'sprites/stumble_2.png', 'sprites/stumble_3.png', 'sprites/stumble_4.png'],
@@ -1292,8 +1292,8 @@ function drawTiger(cx, groundScreenY, state, animT, footY, skins){
 
   let list = SPRITES.run, idx = 0;
   if(state==='run'){
-    // 2-frame gait alternation, timed like the old procedural leg-swing
-    idx = Math.sin(animT*13) > 0 ? 0 : 1;
+    // 3-frame gait cycle: compact-right -> extended-right -> left-forward
+    idx = Math.floor(animT / 0.13) % 3;
   } else if(state==='jump'){
     list = SPRITES.jump;
     idx = player.vy < -100 ? 0 : (player.vy > 100 ? 2 : 1);
