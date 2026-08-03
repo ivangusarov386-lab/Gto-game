@@ -175,6 +175,17 @@
     pointer-events:none;
   }
   #hud .starCount{color:#ffe066;}
+  #hudCombo{
+    position:absolute;
+    top:2vmin;
+    left:50%;
+    font-weight:700;
+    font-size:clamp(13px,2.8vmin,22px);
+    color:#ffe066;
+    text-shadow:1px 1px 2px rgba(0,0,0,0.6);
+    pointer-events:none;
+    white-space:nowrap;
+  }
   .medalBadge{
     width:clamp(64px,12vmin,96px);
     height:clamp(64px,12vmin,96px);
@@ -274,6 +285,7 @@
       <div id="hudScore">0 м</div>
       <div id="hudStars">⭐ <span class="starCount">0</span></div>
     </div>
+    <div id="hudCombo" class="hidden">🔥 x1</div>
 
     <div id="toast"></div>
 
@@ -423,6 +435,7 @@ const Snd = (function(){
     duck(){ tone(220,0.09,'sine',0.09,0,140); },
     star(){ tone(880,0.09,'square',0.11); tone(1318,0.12,'square',0.09,0.07); },
     hit(){ noiseBurst(0.28,0.2); tone(140,0.3,'sawtooth',0.14,0,55); },
+    combo(n){ tone(440+Math.min(n,10)*40, 0.09, 'square', 0.1); },
     unlock(){ tone(660,0.1,'square',0.12); tone(880,0.1,'square',0.12,0.1); tone(1100,0.16,'square',0.12,0.2); },
     click(){ tone(600,0.05,'square',0.07); },
     startMusic, stopMusic,
@@ -528,6 +541,10 @@ let shakeTime = 0;
 let dustTimer = 0;
 let landSquashT = 0;
 let hitFlash = 0;
+let comboCount = 0;
+let comboMultiplier = 1;
+let comboBonus = 0;
+let comboFlashT = 0;
 
 const player = {
   footY:0, vy:0,
@@ -553,6 +570,10 @@ function resetRun(){
   dustTimer = 0;
   landSquashT = 0;
   hitFlash = 0;
+  comboCount = 0;
+  comboMultiplier = 1;
+  comboBonus = 0;
+  comboFlashT = 0;
   player.footY = 0;
   player.vy = 0;
   player.grounded = true;
@@ -605,7 +626,6 @@ function update(dt){
     t += dt;
     speed = Math.min(MAX_SPEED, BASE_SPEED + t*ACCEL);
     distancePx += speed*dt;
-    score = Math.floor(distancePx/METER_PX) + starsThisRun*3;
 
     updatePlayerPhysics(dt);
 
@@ -623,13 +643,22 @@ function update(dt){
     }
 
     // move obstacles & stars
-    for(const o of obstacles) o.x -= speed*dt;
+    const clearLine = PLAYER_X - 13;
+    for(const o of obstacles){
+      o.x -= speed*dt;
+      if(!o.passed && o.x + o.w < clearLine){
+        o.passed = true;
+        registerComboClear();
+      }
+    }
     obstacles = obstacles.filter(o=>o.x + o.w > -20);
     for(const s of stars) s.x -= speed*dt;
     stars = stars.filter(s=>s.x > -20 && !s.collected);
 
     checkStarCollisions();
     checkObstacleCollisions();
+
+    score = Math.floor(distancePx/METER_PX) + starsThisRun*3 + comboBonus;
 
     bg.track -= speed*dt;
     bg.stands -= speed*dt*0.35;
@@ -644,6 +673,7 @@ function update(dt){
 
   landSquashT = Math.max(0, landSquashT-dt);
   hitFlash = Math.max(0, hitFlash-dt);
+  comboFlashT = Math.max(0, comboFlashT-dt);
 
   for(const p of particles) { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=600*dt; p.life-=dt; }
   particles = particles.filter(p=>p.life>0);
@@ -748,12 +778,27 @@ function checkStarCollisions(){
   }
 }
 
+function registerComboClear(){
+  comboCount++;
+  comboMultiplier = Math.min(3, 1 + Math.floor(comboCount/3)*0.5);
+  comboBonus += Math.round(5*comboMultiplier);
+  comboFlashT = 0.4;
+  Snd.combo(comboCount);
+  if(comboCount>=2){
+    for(let i=0;i<4;i++){
+      particles.push({x:PLAYER_X, y:GROUND_Y-player.footY-30, vx:rand(-40,40), vy:rand(-100,-30), life:0.35, maxLife:0.35, color:'#ffe066', size:3});
+    }
+  }
+}
+
 function triggerStumble(){
   screenState = 'stumble';
   player.state = 'stumble';
   stumbleTimer = STUMBLE_TIME;
   shakeTime = 0.35;
   hitFlash = 0.15;
+  comboCount = 0;
+  comboMultiplier = 1;
   Snd.hit();
   Snd.stopMusic();
   for(let i=0;i<10;i++){
@@ -1074,18 +1119,29 @@ requestAnimationFrame(loop);
 const hudEl = document.getElementById('hud');
 const hudScore = document.getElementById('hudScore');
 const hudStars = document.querySelector('#hud .starCount');
+const hudCombo = document.getElementById('hudCombo');
 function updateHud(){
   if(screenState==='playing'){
     hudEl.classList.remove('hidden');
     duckBtn.classList.remove('hidden');
     hudScore.textContent = Math.floor(distancePx/METER_PX) + ' м';
     hudStars.textContent = starsThisRun;
+    if(comboCount>=1){
+      hudCombo.classList.remove('hidden');
+      hudCombo.textContent = '🔥 x'+comboMultiplier+' ('+comboCount+')';
+      const scale = 1 + comboFlashT*0.6;
+      hudCombo.style.transform = 'translateX(-50%) scale('+scale+')';
+    } else {
+      hudCombo.classList.add('hidden');
+    }
   } else if(screenState==='stumble'){
     hudEl.classList.remove('hidden');
     duckBtn.classList.add('hidden');
+    hudCombo.classList.add('hidden');
   } else {
     hudEl.classList.add('hidden');
     duckBtn.classList.add('hidden');
+    hudCombo.classList.add('hidden');
   }
 }
 
