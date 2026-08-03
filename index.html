@@ -377,8 +377,9 @@ window.addEventListener('keyup', e=>{
 
 /* ---------- constants ---------- */
 const GROUND_Y = 200;
-const GRAVITY = 1500;
-const JUMP_VY = -430;
+const GRAVITY = 1250;
+const JUMP_VY = -500;
+const JUMP_GRACE = 6; // px of forgiveness so near-misses on the way up/down don't count as a hit
 const METER_PX = 16;
 const BASE_SPEED = 150;
 const MAX_SPEED = 430;
@@ -391,8 +392,8 @@ const HITBOX_DUCK_H = 20;
 
 /* obstacle definitions: kind 'block' needs jump (dangerTop), kind 'bar' needs duck (dangerBottom) */
 const OBSTACLE_TYPES = [
-  {id:'hurdle', kind:'block', dangerTop:30, w:16, weight:3},
-  {id:'puddle', kind:'block', dangerTop:15, w:46, weight:2},
+  {id:'hurdle', kind:'block', dangerTop:24, w:16, weight:3},
+  {id:'puddle', kind:'block', dangerTop:12, w:46, weight:2},
   {id:'lowbar', kind:'bar', dangerBottom:34, w:14, weight:2},
 ];
 
@@ -564,7 +565,7 @@ function checkObstacleCollisions(){
     if(oR < pxL || oL > pxR) continue;
     let hit = false;
     if(o.def.kind==='block'){
-      if(footY < o.def.dangerTop) hit = true;
+      if(footY < o.def.dangerTop - JUMP_GRACE) hit = true;
     } else if(o.def.kind==='bar'){
       if(headY > o.def.dangerBottom) hit = true;
     }
