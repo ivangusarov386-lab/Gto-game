@@ -246,6 +246,23 @@
     user-select:none;
   }
   #duckBtn:active{background:rgba(35,79,156,0.9);}
+  #muteBtn{
+    position:absolute;
+    top:2vmin;right:2vmin;
+    z-index:25;
+    width:clamp(30px,6vmin,40px);
+    height:clamp(30px,6vmin,40px);
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.5);
+    background:rgba(0,0,0,0.35);
+    color:#fff;
+    font-size:clamp(14px,3vmin,18px);
+    padding:0;
+    cursor:pointer;
+    -webkit-appearance:none;
+    appearance:none;
+    outline:none;
+  }
 </style>
 </head>
 <body>
@@ -260,6 +277,7 @@
 
     <div id="toast"></div>
 
+    <button id="muteBtn">🔊</button>
     <button id="duckBtn" class="hidden">⬇<br>ПРИСЕСТЬ</button>
 
     <div id="menuScreen" class="overlay">
@@ -329,6 +347,94 @@ function persist(){
   localStorage.setItem(SAVE_KEY, JSON.stringify(save));
 }
 
+/* ---------- audio (synthesized, no external files) ---------- */
+const Snd = (function(){
+  let ctx = null;
+  let muted = localStorage.getItem('tigerGto_muted_v1')==='1';
+  let musicTimer = null;
+  let musicStep = 0;
+  const MELODY = [392.00,440.00,523.25,440.00,392.00,329.63,392.00,440.00,
+                   523.25,587.33,523.25,440.00,392.00,440.00,329.63,293.66];
+  const NOTE_DUR = 0.17;
+
+  function ensureCtx(){
+    if(!ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return null;
+      ctx = new AC();
+    }
+    if(ctx.state==='suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq, dur, type, vol, delay, glideTo){
+    if(muted) return;
+    const c = ensureCtx();
+    if(!c) return;
+    const t0 = c.currentTime + (delay||0);
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type||'square';
+    osc.frequency.setValueAtTime(freq, t0);
+    if(glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t0+dur);
+    gain.gain.setValueAtTime(vol||0.15, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0+dur+0.02);
+  }
+  function noiseBurst(dur, vol){
+    if(muted) return;
+    const c = ensureCtx();
+    if(!c) return;
+    const n = Math.max(1, Math.floor(c.sampleRate*dur));
+    const buffer = c.createBuffer(1, n, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<n;i++) data[i] = (Math.random()*2-1)*(1-i/n);
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(vol, c.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime+dur);
+    src.connect(gain).connect(c.destination);
+    src.start();
+  }
+
+  function scheduleNote(){
+    if(muted){ musicTimer=null; return; }
+    tone(MELODY[musicStep % MELODY.length], NOTE_DUR*0.85, 'triangle', 0.045);
+    musicStep++;
+    musicTimer = setTimeout(scheduleNote, NOTE_DUR*1000);
+  }
+  function startMusic(){
+    if(musicTimer) return;
+    ensureCtx();
+    musicStep = 0;
+    scheduleNote();
+  }
+  function stopMusic(){
+    clearTimeout(musicTimer);
+    musicTimer = null;
+  }
+
+  return {
+    ensureCtx,
+    jump(){ tone(520,0.14,'square',0.14,0,780); },
+    land(){ tone(160,0.07,'triangle',0.1,0,90); },
+    duck(){ tone(220,0.09,'sine',0.09,0,140); },
+    star(){ tone(880,0.09,'square',0.11); tone(1318,0.12,'square',0.09,0.07); },
+    hit(){ noiseBurst(0.28,0.2); tone(140,0.3,'sawtooth',0.14,0,55); },
+    unlock(){ tone(660,0.1,'square',0.12); tone(880,0.1,'square',0.12,0.1); tone(1100,0.16,'square',0.12,0.2); },
+    click(){ tone(600,0.05,'square',0.07); },
+    startMusic, stopMusic,
+    isMuted(){ return muted; },
+    setMuted(m){
+      muted = m;
+      localStorage.setItem('tigerGto_muted_v1', m?'1':'0');
+      if(m) stopMusic();
+    }
+  };
+})();
+
 const SKINS = [
   {key:'none', icon:'🐯', label:'Тигр', cost:0},
   {key:'headband', icon:'🎽', label:'Повязка', cost:12},
@@ -356,6 +462,7 @@ const Input = {
   ducking:false,
 };
 function queueJump(){
+  Snd.ensureCtx();
   Input.jumpQueued = true;
 }
 const stageEl = document.getElementById('stage');
@@ -363,17 +470,29 @@ const duckBtn = document.getElementById('duckBtn');
 // jump: fires the instant you press, anywhere on the stage except the duck button — no delay, no ambiguity
 stageEl.addEventListener('pointerdown', e=>{ e.preventDefault(); queueJump(); }, {passive:false});
 // duck: a dedicated button, active only while held, so it never gets misread as a jump
-duckBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); Input.ducking = true; }, {passive:false});
+duckBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); Snd.ensureCtx(); Input.ducking = true; }, {passive:false});
 function releaseDuck(){ Input.ducking = false; }
 window.addEventListener('pointerup', releaseDuck);
 window.addEventListener('pointercancel', releaseDuck);
 window.addEventListener('keydown', e=>{
   if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); if(!e.repeat) queueJump(); }
-  else if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Input.ducking = true; }
+  else if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Snd.ensureCtx(); Input.ducking = true; }
 });
 window.addEventListener('keyup', e=>{
   if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Input.ducking = false; }
 });
+
+const muteBtn = document.getElementById('muteBtn');
+function refreshMuteBtn(){ muteBtn.textContent = Snd.isMuted() ? '🔇' : '🔊'; }
+muteBtn.addEventListener('pointerdown', e=>{ e.stopPropagation(); e.preventDefault(); });
+muteBtn.addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.ensureCtx();
+  Snd.setMuted(!Snd.isMuted());
+  if(!Snd.isMuted() && screenState==='playing') Snd.startMusic();
+  refreshMuteBtn();
+});
+refreshMuteBtn();
 
 /* ---------- constants ---------- */
 const GROUND_Y = 200;
@@ -406,6 +525,9 @@ let score = 0;
 let starsThisRun = 0;
 let stumbleTimer = 0;
 let shakeTime = 0;
+let dustTimer = 0;
+let landSquashT = 0;
+let hitFlash = 0;
 
 const player = {
   footY:0, vy:0,
@@ -428,6 +550,9 @@ function resetRun(){
   starsThisRun = 0;
   stumbleTimer = 0;
   shakeTime = 0;
+  dustTimer = 0;
+  landSquashT = 0;
+  hitFlash = 0;
   player.footY = 0;
   player.vy = 0;
   player.grounded = true;
@@ -517,13 +642,31 @@ function update(dt){
     }
   }
 
+  landSquashT = Math.max(0, landSquashT-dt);
+  hitFlash = Math.max(0, hitFlash-dt);
+
   for(const p of particles) { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=600*dt; p.life-=dt; }
   particles = particles.filter(p=>p.life>0);
+}
+
+function spawnDust(count, burst){
+  for(let i=0;i<count;i++){
+    const life = burst ? 0.35 : 0.28;
+    particles.push({
+      x: PLAYER_X + rand(-6,6),
+      y: GROUND_Y - rand(0,2),
+      vx: burst ? rand(-70,20) : rand(-40,-10),
+      vy: burst ? rand(-90,-10) : rand(-20,-5),
+      life, maxLife:life,
+      color:'#c9a06a', size:3
+    });
+  }
 }
 
 function updatePlayerPhysics(dt){
   // duck only while grounded
   if(player.grounded && Input.ducking && screenState==='playing'){
+    if(player.state !== 'duck') Snd.duck();
     player.state = 'duck';
   } else if(player.grounded){
     player.state = 'run';
@@ -533,6 +676,7 @@ function updatePlayerPhysics(dt){
     player.vy = JUMP_VY;
     player.grounded = false;
     player.state = 'jump';
+    Snd.jump();
   }
   Input.jumpQueued = false;
 
@@ -544,11 +688,22 @@ function updatePlayerPhysics(dt){
       player.vy = 0;
       player.grounded = true;
       player.state = Input.ducking ? 'duck' : 'run';
+      Snd.land();
+      landSquashT = 0.15;
+      spawnDust(6, true);
     } else {
       player.state = 'jump';
     }
   }
   player.animT += dt;
+
+  if(screenState==='playing' && player.grounded && player.state==='run'){
+    dustTimer -= dt;
+    if(dustTimer<=0){
+      spawnDust(1, false);
+      dustTimer = 0.12;
+    }
+  }
 }
 
 function playerHitboxH(){
@@ -585,8 +740,9 @@ function checkStarCollisions(){
       s.collected = true;
       starsThisRun++;
       save.totalStars++;
+      Snd.star();
       for(let i=0;i<6;i++){
-        particles.push({x:PLAYER_X, y:GROUND_Y-starFoot, vx:rand(-60,60), vy:rand(-160,-40), life:0.5, color:'#ffe066'});
+        particles.push({x:PLAYER_X, y:GROUND_Y-starFoot, vx:rand(-60,60), vy:rand(-160,-40), life:0.5, maxLife:0.5, color:'#ffe066'});
       }
     }
   }
@@ -597,8 +753,11 @@ function triggerStumble(){
   player.state = 'stumble';
   stumbleTimer = STUMBLE_TIME;
   shakeTime = 0.35;
+  hitFlash = 0.15;
+  Snd.hit();
+  Snd.stopMusic();
   for(let i=0;i<10;i++){
-    particles.push({x:PLAYER_X, y:GROUND_Y-player.footY-30, vx:rand(-90,90), vy:rand(-200,-40), life:0.6, color: i%2? '#fff':'#ffd23f'});
+    particles.push({x:PLAYER_X, y:GROUND_Y-player.footY-30, vx:rand(-90,90), vy:rand(-200,-40), life:0.6, maxLife:0.6, color: i%2? '#fff':'#ffd23f'});
   }
 }
 
@@ -609,6 +768,7 @@ function enterGameOver(){
   save.bestScore = Math.max(save.bestScore, score);
   const unlockedNow = tryUnlockAll();
   persist();
+  if(unlockedNow.length) Snd.unlock();
   showGameOverScreen(dist, unlockedNow);
 }
 
@@ -772,6 +932,10 @@ function drawTiger(cx, groundScreenY, state, animT, footY, skins){
     headDrop = 2;
   }
 
+  if((state==='run' || state==='duck') && landSquashT>0){
+    squash *= (1 - (landSquashT/0.15)*0.25);
+  }
+
   ctx.rotate(rot);
   const bodyTop = -34*squash;
   const hipY = -14*squash;
@@ -879,8 +1043,16 @@ function render(){
   drawTiger(PLAYER_X, GROUND_Y, drawState, animT, footY, skins);
 
   for(const p of particles){
+    const s = p.size||4;
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life/(p.maxLife||p.life||1)));
     ctx.fillStyle = p.color;
-    ctx.fillRect(p.x-2, p.y-2, 4,4);
+    ctx.fillRect(p.x-s/2, p.y-s/2, s, s);
+  }
+  ctx.globalAlpha = 1;
+
+  if(hitFlash>0){
+    ctx.fillStyle = 'rgba(255,255,255,'+(hitFlash/0.15*0.5)+')';
+    ctx.fillRect(0,0,W,H);
   }
   ctx.restore();
 }
@@ -944,7 +1116,9 @@ function renderSkinRow(){
       btn.appendChild(lock);
     }
     btn.addEventListener('click', ()=>{
+      Snd.ensureCtx();
       if(!unlocked) return;
+      Snd.click();
       if(s.key==='none'){
         save.equipped.headband=false; save.equipped.cap=false; save.equipped.sneakers=false;
       } else {
@@ -1003,16 +1177,22 @@ function showGameOverScreen(dist, unlockedNow){
 }
 
 startBtn.addEventListener('click', ()=>{
+  Snd.ensureCtx(); Snd.click();
   menuScreen.classList.add('hidden');
   resetRun();
   screenState = 'playing';
+  Snd.startMusic();
 });
 retryBtn.addEventListener('click', ()=>{
+  Snd.click();
   gameOverScreen.classList.add('hidden');
   resetRun();
   screenState = 'playing';
+  Snd.startMusic();
 });
 menuBtn.addEventListener('click', ()=>{
+  Snd.click();
+  Snd.stopMusic();
   showMenu();
 });
 
