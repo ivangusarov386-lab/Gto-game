@@ -222,6 +222,30 @@
   }
   #toast.show{opacity:1;top:6%;}
   .rowGap{display:flex;gap:0.6em;flex-wrap:wrap;justify-content:center;}
+  #duckBtn{
+    position:absolute;
+    left:3vmin;bottom:3vmin;
+    z-index:15;
+    width:clamp(64px,16vmin,110px);
+    height:clamp(64px,16vmin,110px);
+    border-radius:50%;
+    border:3px solid #234f9c;
+    background:rgba(47,111,209,0.75);
+    color:#fff;
+    font-weight:700;
+    font-family:inherit;
+    font-size:clamp(10px,2vmin,14px);
+    line-height:1.3;
+    padding:0;
+    cursor:pointer;
+    touch-action:none;
+    -webkit-appearance:none;
+    appearance:none;
+    outline:none;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  #duckBtn:active{background:rgba(35,79,156,0.9);}
 </style>
 </head>
 <body>
@@ -236,6 +260,8 @@
 
     <div id="toast"></div>
 
+    <button id="duckBtn" class="hidden">⬇<br>ПРИСЕСТЬ</button>
+
     <div id="menuScreen" class="overlay">
       <div class="panel">
         <h1 class="title">🐯 Тигр-ГТО</h1>
@@ -244,7 +270,7 @@
         <div>
           <button class="btn" id="startBtn">СТАРТ</button>
         </div>
-        <p class="hint">Тап / пробел — прыжок&nbsp;&nbsp;·&nbsp;&nbsp;удержание — присесть</p>
+        <p class="hint">Тап / пробел — прыжок через барьер и лужу&nbsp;&nbsp;·&nbsp;&nbsp;кнопка ⬇ — присесть под перекладину</p>
         <p class="hint" id="bestLine"></p>
       </div>
     </div>
@@ -328,41 +354,25 @@ function tryUnlockAll(){
 const Input = {
   jumpQueued:false,
   ducking:false,
-  _downTime:0,
-  _downActive:false,
-  HOLD_MS:170,
-  _holdTimer:null,
 };
-function inputDown(){
-  if(Input._downActive) return;
-  Input._downActive = true;
-  Input._downTime = performance.now();
-  clearTimeout(Input._holdTimer);
-  Input._holdTimer = setTimeout(()=>{
-    if(Input._downActive) Input.ducking = true;
-  }, Input.HOLD_MS);
-}
-function inputUp(){
-  if(!Input._downActive) return;
-  Input._downActive = false;
-  clearTimeout(Input._holdTimer);
-  const dur = performance.now() - Input._downTime;
-  if(dur < Input.HOLD_MS){
-    Input.jumpQueued = true;
-  }
-  Input.ducking = false;
+function queueJump(){
+  Input.jumpQueued = true;
 }
 const stageEl = document.getElementById('stage');
-stageEl.addEventListener('pointerdown', e=>{ e.preventDefault(); inputDown(); }, {passive:false});
-window.addEventListener('pointerup', e=>{ inputUp(); });
-window.addEventListener('pointercancel', e=>{ inputUp(); });
+const duckBtn = document.getElementById('duckBtn');
+// jump: fires the instant you press, anywhere on the stage except the duck button — no delay, no ambiguity
+stageEl.addEventListener('pointerdown', e=>{ e.preventDefault(); queueJump(); }, {passive:false});
+// duck: a dedicated button, active only while held, so it never gets misread as a jump
+duckBtn.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); Input.ducking = true; }, {passive:false});
+function releaseDuck(){ Input.ducking = false; }
+window.addEventListener('pointerup', releaseDuck);
+window.addEventListener('pointercancel', releaseDuck);
 window.addEventListener('keydown', e=>{
-  if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); inputDown(); }
+  if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); if(!e.repeat) queueJump(); }
   else if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Input.ducking = true; }
 });
 window.addEventListener('keyup', e=>{
-  if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); inputUp(); }
-  else if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Input.ducking = false; }
+  if(e.code==='ArrowDown' || e.code==='KeyS'){ e.preventDefault(); Input.ducking = false; }
 });
 
 /* ---------- constants ---------- */
@@ -381,9 +391,9 @@ const HITBOX_DUCK_H = 20;
 
 /* obstacle definitions: kind 'block' needs jump (dangerTop), kind 'bar' needs duck (dangerBottom) */
 const OBSTACLE_TYPES = [
-  {id:'hurdle', kind:'block', dangerTop:36, w:16, weight:3},
+  {id:'hurdle', kind:'block', dangerTop:30, w:16, weight:3},
   {id:'puddle', kind:'block', dangerTop:15, w:46, weight:2},
-  {id:'lowbar', kind:'bar', dangerBottom:26, w:14, weight:2},
+  {id:'lowbar', kind:'bar', dangerBottom:34, w:14, weight:2},
 ];
 
 /* ---------- game state ---------- */
@@ -669,6 +679,21 @@ function drawCloud(x,y){
   ctx.fill();
 }
 
+function drawHint(cx, y, dir){
+  ctx.fillStyle = dir==='up' ? '#ffffff' : '#ffe066';
+  ctx.strokeStyle = '#1a1008';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if(dir==='up'){
+    ctx.moveTo(cx-7,y+6); ctx.lineTo(cx+7,y+6); ctx.lineTo(cx,y-6);
+  } else {
+    ctx.moveTo(cx-7,y-6); ctx.lineTo(cx+7,y-6); ctx.lineTo(cx,y+6);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
 function drawObstacle(o){
   const x = o.x;
   if(o.def.id==='hurdle'){
@@ -676,6 +701,7 @@ function drawObstacle(o){
     block(x+o.w-4, GROUND_Y-4, 3, 4, '#8a5a2c');
     block(x, GROUND_Y-o.def.dangerTop, o.w, 8, '#e2402c');
     for(let i=0;i<o.w;i+=8) block(x+i, GROUND_Y-o.def.dangerTop, 4, 8, '#fff');
+    drawHint(x+o.w/2, GROUND_Y-o.def.dangerTop-18, 'up');
   } else if(o.def.id==='puddle'){
     ctx.fillStyle = '#3d7fd6';
     ctx.beginPath();
@@ -685,11 +711,13 @@ function drawObstacle(o){
     ctx.beginPath();
     ctx.ellipse(x+o.w/2-6, GROUND_Y-4, o.w/4, 3, 0, 0, Math.PI*2);
     ctx.fill();
+    drawHint(x+o.w/2, GROUND_Y-28, 'up');
   } else if(o.def.id==='lowbar'){
     block(x+1, GROUND_Y-o.def.dangerBottom, 3, o.def.dangerBottom, '#8a5a2c');
     block(x+o.w-4, GROUND_Y-o.def.dangerBottom, 3, o.def.dangerBottom, '#8a5a2c');
     block(x, GROUND_Y-o.def.dangerBottom-6, o.w, 6, '#f2b705');
     for(let i=0;i<o.w;i+=8) block(x+i, GROUND_Y-o.def.dangerBottom-6, 4, 6, '#3b2412');
+    drawHint(x+o.w/2, GROUND_Y-o.def.dangerBottom-20, 'down');
   }
 }
 
@@ -874,12 +902,17 @@ const hudEl = document.getElementById('hud');
 const hudScore = document.getElementById('hudScore');
 const hudStars = document.querySelector('#hud .starCount');
 function updateHud(){
-  if(screenState==='playing' || screenState==='stumble'){
+  if(screenState==='playing'){
     hudEl.classList.remove('hidden');
+    duckBtn.classList.remove('hidden');
     hudScore.textContent = Math.floor(distancePx/METER_PX) + ' м';
     hudStars.textContent = starsThisRun;
+  } else if(screenState==='stumble'){
+    hudEl.classList.remove('hidden');
+    duckBtn.classList.add('hidden');
   } else {
     hudEl.classList.add('hidden');
+    duckBtn.classList.add('hidden');
   }
 }
 
