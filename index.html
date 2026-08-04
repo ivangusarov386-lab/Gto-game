@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Тигр-ГТО</title>
+<title>Тигр-Спортсмен</title>
 <style>
   :root{
     --panel:#fff7e6;
@@ -16,7 +16,9 @@
   }
   *{box-sizing:border-box;}
   html,body{
-    margin:0;padding:0;height:100%;
+    margin:0;padding:0;
+    height:100%;
+    height:100dvh;
     background:#1c1208;
     font-family:'Trebuchet MS','Segoe UI',Verdana,sans-serif;
     overflow:hidden;
@@ -26,12 +28,16 @@
     position:relative;
     width:100%;
     height:100%;
+    height:100dvh;
     display:flex;
     align-items:center;
     justify-content:center;
   }
   #stage{
     position:relative;
+    /* JS (fitStage) sets explicit width/height in px so this always fits the real
+       viewport on mobile browsers, where aspect-ratio + max-height in a flex
+       container is unreliable; these are just a pre-JS fallback. */
     width:100%;
     max-width:900px;
     aspect-ratio:16/9;
@@ -308,6 +314,16 @@
     appearance:none;
     outline:none;
   }
+  #clubLogo{
+    position:absolute;
+    top:2vmin;left:2vmin;
+    z-index:25;
+    width:clamp(34px,7vmin,48px);
+    height:clamp(34px,7vmin,48px);
+    border-radius:50%;
+    box-shadow:0 2px 6px rgba(0,0,0,0.5);
+    pointer-events:none;
+  }
 </style>
 </head>
 <body>
@@ -324,13 +340,14 @@
 
     <div id="toast"></div>
 
+    <img id="clubLogo" src="assets/club_logo.png" alt="Школьный спортивный клуб 548 Лидер">
     <button id="muteBtn">🔊</button>
     <button id="duckBtn" class="hidden">⬇<br>ПРИСЕСТЬ</button>
     <button id="jumpBtn" class="hidden">⬆<br>ПРЫЖОК</button>
 
     <div id="menuScreen" class="overlay">
       <div class="panel">
-        <h1 class="title">🐯 Тигр-ГТО</h1>
+        <h1 class="title">🐯 Тигр-Спортсмен</h1>
         <p class="subtitle">Помоги тигру сдать нормативы ГТО!</p>
         <div id="skinRow"></div>
         <div>
@@ -547,6 +564,29 @@ function queueJump(){
   Input.jumpQueued = true;
 }
 const stageEl = document.getElementById('stage');
+
+/* fit the 16:9 stage inside the real visible viewport — CSS aspect-ratio +
+   max-height inside a flex container is unreliable on mobile browsers
+   (address-bar show/hide, portrait orientation), so size it explicitly in JS */
+function fitStage(){
+  const vp = window.visualViewport;
+  const vw = vp ? vp.width : window.innerWidth;
+  const vh = vp ? vp.height : window.innerHeight;
+  const ASPECT = 16/9;
+  let w = Math.min(vw, 900);
+  let h = w / ASPECT;
+  if(h > vh){
+    h = vh;
+    w = h * ASPECT;
+  }
+  stageEl.style.width = w + 'px';
+  stageEl.style.height = h + 'px';
+}
+fitStage();
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', fitStage);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', fitStage);
+
 const duckBtn = document.getElementById('duckBtn');
 const jumpBtn = document.getElementById('jumpBtn');
 // jump: fires the instant you press, anywhere on the stage — no delay, no ambiguity
