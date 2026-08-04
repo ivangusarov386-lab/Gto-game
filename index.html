@@ -1574,18 +1574,18 @@ function showMenu(){
 }
 
 const MEDALS = [
-  {min:2000, key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'},
-  {min:1500, key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'},
-  {min:1000, key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'},
+  {min:1100, key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'},
+  {min:800, key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'},
+  {min:600, key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'},
   {min:0, key:'none', icon:'🐯', phrase:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'},
 ];
 function getMedal(dist){
   return MEDALS.find(m=>dist>=m.min);
 }
 const MEDAL_TIERS_ASC = [
-  {min:1000, label:'Бронзы'},
-  {min:1500, label:'Серебра'},
-  {min:2000, label:'Золота'},
+  {min:600, label:'Бронзы'},
+  {min:800, label:'Серебра'},
+  {min:1100, label:'Золота'},
 ];
 function getNextMedalGap(dist){
   for(const t of MEDAL_TIERS_ASC){
