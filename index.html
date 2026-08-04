@@ -751,22 +751,10 @@ const bg = { stands:0, track:0 };
 /* ---------- scenery zones (change every ZONE_LENGTH_M for a sense of progress) ---------- */
 const ZONE_LENGTH_M = 45;
 const ZONES = [
-  { key:'stadium', label:'🏟 Стадион',
-    skyTop:'#8fd3f4', skyBot:'#e8f6ff',
-    grass:'#4c9a3d', grassDark:'#3a7a2e',
-    track:'#b5652f', trackDark:'#8f4c22' },
-  { key:'park', label:'🌳 Парк',
-    skyTop:'#bfe9d0', skyBot:'#f2fbf0',
-    grass:'#6bb852', grassDark:'#549141',
-    track:'#c99a5b', trackDark:'#a97c3f' },
-  { key:'gym', label:'🏋 Спортзал',
-    skyTop:'#dfe7ee', skyBot:'#eef3f7',
-    grass:'#c9a06a', grassDark:'#a9835a',
-    track:'#d8b27e', trackDark:'#b8905e' },
-  { key:'city', label:'🏙 Город',
-    skyTop:'#8fd3f4', skyBot:'#e8f6ff',
-    grass:'#c9cdd1', grassDark:'#aeb3b8',
-    track:'#8b9096', trackDark:'#6f747a' },
+  { key:'stadium', label:'🏟 Стадион', skyTop:'#8fd3f4', skyBot:'#e8f6ff', track:'#b5652f' },
+  { key:'park', label:'🌳 Парк', skyTop:'#bfe9d0', skyBot:'#f2fbf0', track:'#c99a5b' },
+  { key:'gym', label:'🏋 Спортзал', skyTop:'#dfe7ee', skyBot:'#eef3f7', track:'#d8b27e' },
+  { key:'city', label:'🏙 Город', skyTop:'#8fd3f4', skyBot:'#e8f6ff', track:'#8b9096' },
 ];
 function hexToRgb(hex){
   hex = hex.replace('#','');
@@ -1122,21 +1110,25 @@ function enterGameOver(){
 }
 
 /* ---------- drawing ---------- */
-function drawZoneImageLayer(zoneKey, alpha){
-  const entry = ZONE_BG_IMAGES[zoneKey];
+function drawTiledZoneImage(entry, alpha, destY, destH, scrollOffset){
   if(!entry || !entry.ready) return false;
-  const destH = GROUND_Y;
   const destW = entry.w * (destH / entry.h);
-  let offset = (-bg.stands) % destW;
+  let offset = (-scrollOffset) % destW;
   if(offset < 0) offset += destW;
   ctx.globalAlpha = alpha;
   let x = -offset;
   while(x < W){
-    ctx.drawImage(entry.img, x, 0, destW, destH);
+    ctx.drawImage(entry.img, x, destY, destW, destH);
     x += destW;
   }
   ctx.globalAlpha = 1;
   return true;
+}
+function drawZoneImageLayer(zoneKey, alpha){
+  return drawTiledZoneImage(ZONE_BG_IMAGES[zoneKey], alpha, 0, GROUND_Y, bg.stands);
+}
+function drawZoneTrackLayer(zoneKey, alpha){
+  return drawTiledZoneImage(ZONE_TRACK_IMAGES[zoneKey], alpha, GROUND_Y, H-GROUND_Y, bg.track);
 }
 
 function drawBackground(){
@@ -1156,27 +1148,15 @@ function drawBackground(){
     drawZoneImageLayer(zoneB.key, blend);
   }
 
-  // grass / floor strip
-  ctx.fillStyle = zc('grass');
-  ctx.fillRect(0, GROUND_Y-14, W, 14);
-  const grassDark = zc('grassDark');
-  for(let i=0;i<W/12+2;i++){
-    const gx = ((i*12 + bg.track*0.4) % (W+12));
-    block(gx, GROUND_Y-14, 6, 4, grassDark, 2);
+  // track / floor: the real filmed track/floor/pavement, scrolling at full
+  // ground speed (matching bg.track) since it's the nearest depth layer
+  const drewTrackA = drawZoneTrackLayer(zoneA.key, 1);
+  if(!drewTrackA){
+    ctx.fillStyle = zc('track');
+    ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
   }
-
-  // track / floor
-  ctx.fillStyle = zc('track');
-  ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
-  ctx.fillStyle = zc('trackDark');
-  for(let lane=0; lane<3; lane++){
-    const ly = GROUND_Y + 8 + lane*22;
-    ctx.fillRect(0, ly, W, 2);
-  }
-  const dashW = 22, gapW = 18;
-  for(let i=0;i<W/(dashW+gapW)+2;i++){
-    const dx = ((i*(dashW+gapW) + bg.track) % (W+dashW+gapW)) - dashW;
-    block(dx, GROUND_Y+30, dashW, 4, '#fff', 2);
+  if(blend>0){
+    drawZoneTrackLayer(zoneB.key, blend);
   }
 }
 function drawHint(cx, y, dir){
@@ -1338,20 +1318,33 @@ const ZONE_BG_FILES = {
   gym: 'assets/backgrounds/gym_bg.png',
   city: 'assets/backgrounds/city_bg.png',
 };
+const ZONE_TRACK_FILES = {
+  stadium: 'assets/backgrounds/stadium_track.png',
+  park: 'assets/backgrounds/park_track.png',
+  gym: 'assets/backgrounds/gym_track.png',
+  city: 'assets/backgrounds/city_track.png',
+};
 const ZONE_BG_IMAGES = {};
-function loadZoneBackgrounds(){
+const ZONE_TRACK_IMAGES = {};
+function loadImageMap(files, into){
   const promises = [];
-  for(const key in ZONE_BG_FILES){
+  for(const key in files){
     const img = new Image();
     const entry = {img, w:0, h:0, ready:false};
     promises.push(new Promise(res=>{
       img.onload = ()=>{ entry.w = img.naturalWidth; entry.h = img.naturalHeight; entry.ready = true; res(); };
       img.onerror = res;
     }));
-    img.src = ZONE_BG_FILES[key];
-    ZONE_BG_IMAGES[key] = entry;
+    img.src = files[key];
+    into[key] = entry;
   }
   return Promise.all(promises);
+}
+function loadZoneBackgrounds(){
+  return Promise.all([
+    loadImageMap(ZONE_BG_FILES, ZONE_BG_IMAGES),
+    loadImageMap(ZONE_TRACK_FILES, ZONE_TRACK_IMAGES),
+  ]);
 }
 
 let duckPoseT = 0;
