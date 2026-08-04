@@ -229,6 +229,17 @@
     margin:0.5em 0;
     max-width:34ch;
   }
+  .resultGap{
+    font-weight:700;
+    color:#8a5a1a;
+    background:#fff0d0;
+    border:2px dashed var(--panel-border);
+    border-radius:10px;
+    padding:0.4em 0.8em;
+    margin:0.6em 0 0.2em;
+    font-size:clamp(12px,2.2vmin,17px);
+    display:inline-block;
+  }
   #toast{
     position:absolute;
     top:10%;
@@ -366,6 +377,7 @@
         <div class="resultLine" id="resultDistance">Дистанция: 0 м</div>
         <div class="resultLine" id="resultStars">Звёзды: 0</div>
         <div class="resultLine" id="resultBest">Рекорд: 0 м</div>
+        <div class="resultGap hidden" id="resultGap">Не хватило 0 м до Бронзы!</div>
         <div class="rowGap" style="margin-top:0.8em;">
           <button class="btn" id="retryBtn">ЕЩЁ РАЗ</button>
           <button class="btn secondary" id="menuBtn">В меню</button>
@@ -1562,13 +1574,24 @@ function showMenu(){
 }
 
 const MEDALS = [
-  {min:320, key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'},
-  {min:180, key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'},
-  {min:80, key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'},
+  {min:2000, key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'},
+  {min:1500, key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'},
+  {min:1000, key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'},
   {min:0, key:'none', icon:'🐯', phrase:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'},
 ];
-function getMedal(score){
-  return MEDALS.find(m=>score>=m.min);
+function getMedal(dist){
+  return MEDALS.find(m=>dist>=m.min);
+}
+const MEDAL_TIERS_ASC = [
+  {min:1000, label:'Бронзы'},
+  {min:1500, label:'Серебра'},
+  {min:2000, label:'Золота'},
+];
+function getNextMedalGap(dist){
+  for(const t of MEDAL_TIERS_ASC){
+    if(dist < t.min) return {label:t.label, gap:t.min-dist};
+  }
+  return null;
 }
 
 function showToast(text){
@@ -1579,7 +1602,7 @@ function showToast(text){
 }
 
 function showGameOverScreen(dist, unlockedNow){
-  const medal = getMedal(score);
+  const medal = getMedal(dist);
   const badge = document.getElementById('medalBadge');
   badge.className = 'medalBadge ' + medal.key;
   badge.textContent = medal.icon;
@@ -1587,6 +1610,16 @@ function showGameOverScreen(dist, unlockedNow){
   document.getElementById('resultDistance').textContent = 'Дистанция: '+dist+' м  ·  Очки: '+score;
   document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun;
   document.getElementById('resultBest').textContent = 'Рекорд: '+save.bestDistance+' м';
+
+  const gapEl = document.getElementById('resultGap');
+  const gap = getNextMedalGap(dist);
+  if(gap){
+    gapEl.textContent = 'Не хватило '+gap.gap+' м до '+gap.label+'!';
+    gapEl.classList.remove('hidden');
+  } else {
+    gapEl.classList.add('hidden');
+  }
+
   gameOverScreen.classList.remove('hidden');
   if(unlockedNow.length){
     showToast('Новый аксессуар: '+unlockedNow.join(', ')+'!');
