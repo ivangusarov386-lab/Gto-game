@@ -77,6 +77,8 @@
     border-radius:16px;
     padding:3vmin 4vmin;
     max-width:90%;
+    max-height:calc(var(--stage-h, 600px) * 0.92);
+    overflow-y:auto;
     box-shadow:0 6px 0 rgba(0,0,0,0.25);
   }
   h1.title{
@@ -118,11 +120,12 @@
     color:#7a5a35;
     margin-top:0.6em;
   }
-  #skinRow{
+  #skinRow, #perkRow{
     display:flex;
     gap:1.4vmin;
     margin:0.8em 0 0.2em;
     justify-content:center;
+    flex-wrap:wrap;
   }
   .skinBtn{
     width:clamp(46px,9vmin,72px);
@@ -159,7 +162,7 @@
     left:0;right:0;
     text-align:center;
   }
-  .skinWrap{position:relative;}
+  .skinWrap{position:relative;margin-bottom:1.7em;}
   #hud{
     position:absolute;
     top:clamp(40px,9vmin,56px);left:0;right:0;
@@ -360,13 +363,15 @@
       <div class="panel">
         <h1 class="title">🐯 Тигр-Спортсмен</h1>
         <p class="subtitle">Помоги тигру сдать нормативы ГТО!</p>
-        <div id="skinRow"></div>
         <div>
           <button class="btn" id="startBtn">СТАРТ</button>
         </div>
+        <p class="hint" id="bestLine"></p>
+        <div id="skinRow"></div>
+        <p class="hint">Улучшения за звёзды:</p>
+        <div id="perkRow"></div>
         <p class="hint">Кнопка ⬆ справа — прыжок через барьер и лужу&nbsp;&nbsp;·&nbsp;&nbsp;кнопка ⬇ слева — присесть под перекладину</p>
         <p class="hint">Лови бонусы: 🛡️ щит от удара · 🧲 магнит звёзд · ⚡ ускорение</p>
-        <p class="hint" id="bestLine"></p>
       </div>
     </div>
 
@@ -377,6 +382,7 @@
         <div class="resultLine" id="resultDistance">Дистанция: 0 м</div>
         <div class="resultLine" id="resultStars">Звёзды: 0</div>
         <div class="resultLine" id="resultBest">Рекорд: 0 м</div>
+        <div class="resultLine" id="resultStage">Ступень: I</div>
         <div class="resultGap hidden" id="resultGap">Не хватило 0 м до Бронзы!</div>
         <div class="rowGap" style="margin-top:0.8em;">
           <button class="btn" id="retryBtn">ЕЩЁ РАЗ</button>
@@ -445,8 +451,10 @@ function defaultSave(){
     bestDistance:0,
     bestScore:0,
     totalStars:0,
+    medalStage:1,
     unlocked:{headband:false, cap:false, sneakers:false},
-    equipped:{headband:false, cap:false, sneakers:false}
+    equipped:{headband:false, cap:false, sneakers:false},
+    perks:{startShield:false, magnetPlus:false, boostPlus:false}
   };
 }
 let save = loadSave();
@@ -552,6 +560,12 @@ const SKINS = [
   {key:'sneakers', icon:'👟', label:'Кроссы', cost:60},
 ];
 
+const PERKS = [
+  {key:'magnetPlus', icon:'🧲', label:'Магнит+', cost:80, desc:'Магнит звёзд действует дольше'},
+  {key:'boostPlus', icon:'⚡', label:'Ускорение+', cost:120, desc:'Ускорение действует дольше'},
+  {key:'startShield', icon:'🛡️', label:'Щит-старт', cost:200, desc:'Забег всегда начинается со щитом'},
+];
+
 function isUnlocked(key){
   return key==='none' || save.unlocked[key];
 }
@@ -561,6 +575,12 @@ function tryUnlockAll(){
     if(s.key!=='none' && !save.unlocked[s.key] && save.totalStars>=s.cost){
       save.unlocked[s.key]=true;
       justUnlocked.push(s.label);
+    }
+  });
+  PERKS.forEach(p=>{
+    if(!save.perks[p.key] && save.totalStars>=p.cost){
+      save.perks[p.key]=true;
+      justUnlocked.push(p.label);
     }
   });
   return justUnlocked;
@@ -593,6 +613,7 @@ function fitStage(){
   }
   stageEl.style.width = w + 'px';
   stageEl.style.height = h + 'px';
+  document.documentElement.style.setProperty('--stage-h', h + 'px');
 }
 fitStage();
 window.addEventListener('resize', fitStage);
@@ -705,7 +726,7 @@ function resetRun(){
   comboBonus = 0;
   comboFlashT = 0;
   currentZoneIdx = 0;
-  shieldActive = false;
+  shieldActive = !!(save.perks && save.perks.startShield);
   magnetT = 0;
   boostT = 0;
   powerupSpawnTimer = rand(10,16);
@@ -820,8 +841,8 @@ function activatePowerup(type){
   Snd.powerup();
   showToast(POWERUP_LABELS[type]);
   if(type==='shield') shieldActive = true;
-  else if(type==='magnet') magnetT = 6;
-  else if(type==='boost') boostT = 5;
+  else if(type==='magnet') magnetT = save.perks.magnetPlus ? 9 : 6;
+  else if(type==='boost') boostT = save.perks.boostPlus ? 8 : 5;
 }
 
 /* ---------- update ---------- */
@@ -1089,10 +1110,18 @@ function enterGameOver(){
   const dist = Math.floor(distancePx/METER_PX);
   save.bestDistance = Math.max(save.bestDistance, dist);
   save.bestScore = Math.max(save.bestScore, score);
+  const stage = save.medalStage;
+  const medal = getMedal(dist, stage);
+  let stageUp = false;
+  if(medal.key==='gold' && stage < MAX_STAGE){
+    save.medalStage = stage+1;
+    stageUp = true;
+  }
   const unlockedNow = tryUnlockAll();
   persist();
-  if(unlockedNow.length) Snd.unlock();
-  showGameOverScreen(dist, unlockedNow);
+  if(stageUp) Snd.unlock();
+  else if(unlockedNow.length) Snd.unlock();
+  showGameOverScreen(dist, unlockedNow, stage, stageUp);
 }
 
 /* ---------- drawing ---------- */
@@ -1526,6 +1555,7 @@ const retryBtn = document.getElementById('retryBtn');
 const menuBtn = document.getElementById('menuBtn');
 const bestLine = document.getElementById('bestLine');
 const skinRow = document.getElementById('skinRow');
+const perkRow = document.getElementById('perkRow');
 const toastEl = document.getElementById('toast');
 
 function renderSkinRow(){
@@ -1565,30 +1595,64 @@ function renderSkinRow(){
   });
 }
 
+function renderPerkRow(){
+  perkRow.innerHTML = '';
+  PERKS.forEach(p=>{
+    const wrap = document.createElement('div');
+    wrap.className='skinWrap';
+    const btn = document.createElement('div');
+    const unlocked = save.perks[p.key];
+    btn.className = 'skinBtn' + (unlocked?' selected':' locked');
+    btn.textContent = p.icon;
+    btn.title = p.desc;
+    if(!unlocked){
+      const lock = document.createElement('div');
+      lock.className='lock';
+      lock.textContent='🔒';
+      btn.appendChild(lock);
+    }
+    wrap.appendChild(btn);
+    const label = document.createElement('div');
+    label.className='skinLabel';
+    label.textContent = unlocked ? p.label : p.label+' ('+p.cost+'⭐)';
+    wrap.appendChild(label);
+    perkRow.appendChild(wrap);
+  });
+}
+
 function showMenu(){
   screenState = 'menu';
   gameOverScreen.classList.add('hidden');
   menuScreen.classList.remove('hidden');
-  bestLine.textContent = save.bestDistance>0 ? ('Лучший результат: '+save.bestDistance+' м') : '';
+  const stageLabel = 'Ступень: '+STAGE_ROMAN[save.medalStage-1];
+  bestLine.textContent = save.bestDistance>0 ? ('Лучший результат: '+save.bestDistance+' м  ·  '+stageLabel) : stageLabel;
   renderSkinRow();
+  renderPerkRow();
 }
 
-const MEDALS = [
-  {min:1100, key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'},
-  {min:800, key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'},
-  {min:600, key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'},
-  {min:0, key:'none', icon:'🐯', phrase:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'},
-];
-function getMedal(dist){
-  return MEDALS.find(m=>dist>=m.min);
+const STAGE_BASE = {bronze:600, silver:800, gold:1100};
+const STAGE_STEP = 100;
+const MAX_STAGE = 7;
+const STAGE_ROMAN = ['I','II','III','IV','V','VI','VII'];
+function stageThresholds(stage){
+  const add = (Math.min(stage, MAX_STAGE)-1)*STAGE_STEP;
+  return {bronze:STAGE_BASE.bronze+add, silver:STAGE_BASE.silver+add, gold:STAGE_BASE.gold+add};
 }
-const MEDAL_TIERS_ASC = [
-  {min:600, label:'Бронзы'},
-  {min:800, label:'Серебра'},
-  {min:1100, label:'Золота'},
-];
-function getNextMedalGap(dist){
-  for(const t of MEDAL_TIERS_ASC){
+function getMedal(dist, stage){
+  const th = stageThresholds(stage);
+  if(dist>=th.gold) return {key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'};
+  if(dist>=th.silver) return {key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'};
+  if(dist>=th.bronze) return {key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'};
+  return {key:'none', icon:'🐯', phrase:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'};
+}
+function getNextMedalGap(dist, stage){
+  const th = stageThresholds(stage);
+  const tiers = [
+    {min:th.bronze, label:'Бронзы'},
+    {min:th.silver, label:'Серебра'},
+    {min:th.gold, label:'Золота'},
+  ];
+  for(const t of tiers){
     if(dist < t.min) return {label:t.label, gap:t.min-dist};
   }
   return null;
@@ -1601,8 +1665,8 @@ function showToast(text){
   showToast._t = setTimeout(()=> toastEl.classList.remove('show'), 2600);
 }
 
-function showGameOverScreen(dist, unlockedNow){
-  const medal = getMedal(dist);
+function showGameOverScreen(dist, unlockedNow, stage, stageUp){
+  const medal = getMedal(dist, stage);
   const badge = document.getElementById('medalBadge');
   badge.className = 'medalBadge ' + medal.key;
   badge.textContent = medal.icon;
@@ -1611,8 +1675,11 @@ function showGameOverScreen(dist, unlockedNow){
   document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun;
   document.getElementById('resultBest').textContent = 'Рекорд: '+save.bestDistance+' м';
 
+  const maxedOut = medal.key==='gold' && stage>=MAX_STAGE;
+  document.getElementById('resultStage').textContent = 'Ступень: '+STAGE_ROMAN[stage-1]+(maxedOut ? ' (максимум!)' : '');
+
   const gapEl = document.getElementById('resultGap');
-  const gap = getNextMedalGap(dist);
+  const gap = getNextMedalGap(dist, stage);
   if(gap){
     gapEl.textContent = 'Не хватило '+gap.gap+' м до '+gap.label+'!';
     gapEl.classList.remove('hidden');
@@ -1621,7 +1688,9 @@ function showGameOverScreen(dist, unlockedNow){
   }
 
   gameOverScreen.classList.remove('hidden');
-  if(unlockedNow.length){
+  if(stageUp){
+    showToast('🎉 Открыта ступень '+STAGE_ROMAN[save.medalStage-1]+'!');
+  } else if(unlockedNow.length){
     showToast('Новый аксессуар: '+unlockedNow.join(', ')+'!');
   }
 }
