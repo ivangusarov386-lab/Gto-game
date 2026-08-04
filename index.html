@@ -867,7 +867,7 @@ function update(dt){
     if(spawnTimer<=0){
       spawnObstacle();
       const difficulty = Math.min(1, t/50);
-      spawnTimer = rand(1.35 - 0.55*difficulty, 2.1 - 0.6*difficulty);
+      spawnTimer = rand(1.35 - 0.55*difficulty, 2.1 - 0.6*difficulty) * stageDifficultyMult();
     }
     starSpawnTimer -= dt;
     if(starSpawnTimer<=0){
@@ -1638,6 +1638,10 @@ function stageThresholds(stage){
   const add = (Math.min(stage, MAX_STAGE)-1)*STAGE_STEP;
   return {bronze:STAGE_BASE.bronze+add, silver:STAGE_BASE.silver+add, gold:STAGE_BASE.gold+add};
 }
+function stageDifficultyMult(){
+  const s = Math.min(save.medalStage, MAX_STAGE);
+  return 1 - 0.25*(s-1)/(MAX_STAGE-1);
+}
 function getMedal(dist, stage){
   const th = stageThresholds(stage);
   if(dist>=th.gold) return {key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'};
@@ -1672,7 +1676,7 @@ function showGameOverScreen(dist, unlockedNow, stage, stageUp){
   badge.textContent = medal.icon;
   document.getElementById('resultPhrase').textContent = medal.phrase;
   document.getElementById('resultDistance').textContent = 'Дистанция: '+dist+' м  ·  Очки: '+score;
-  document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun;
+  document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun+'  ·  Всего: '+save.totalStars+'⭐';
   document.getElementById('resultBest').textContent = 'Рекорд: '+save.bestDistance+' м';
 
   const maxedOut = medal.key==='gold' && stage>=MAX_STAGE;
