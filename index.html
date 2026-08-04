@@ -746,29 +746,27 @@ function resetRun(){
 }
 
 /* ---------- background layers (parallax) ---------- */
-const bg = { sun:0, clouds:0, stands:0, track:0 };
+const bg = { stands:0, track:0 };
 
 /* ---------- scenery zones (change every ZONE_LENGTH_M for a sense of progress) ---------- */
 const ZONE_LENGTH_M = 45;
 const ZONES = [
-  { key:'stadium', label:'🏟 Стадион', outdoor:true,
+  { key:'stadium', label:'🏟 Стадион',
     skyTop:'#8fd3f4', skyBot:'#e8f6ff',
-    bandColor:'#6b4a8a', bandTrim:'#5a3d74',
-    bandDots:['#e2402c','#f2b705','#3d7fd6','#3a9a4a'],
     grass:'#4c9a3d', grassDark:'#3a7a2e',
     track:'#b5652f', trackDark:'#8f4c22' },
-  { key:'park', label:'🌳 Парк', outdoor:true,
+  { key:'park', label:'🌳 Парк',
     skyTop:'#bfe9d0', skyBot:'#f2fbf0',
-    bandColor:'#2f6b3a', bandTrim:'#255a2e',
-    bandDots:['#1e4d26','#3a7d43','#2d6b38','#1e4d26'],
     grass:'#6bb852', grassDark:'#549141',
     track:'#c99a5b', trackDark:'#a97c3f' },
-  { key:'gym', label:'🏋 Спортзал', outdoor:false,
+  { key:'gym', label:'🏋 Спортзал',
     skyTop:'#dfe7ee', skyBot:'#eef3f7',
-    bandColor:'#8a99ab', bandTrim:'#6f7f92',
-    bandDots:['#5c7085','#5c7085','#5c7085','#5c7085'],
     grass:'#c9a06a', grassDark:'#a9835a',
     track:'#d8b27e', trackDark:'#b8905e' },
+  { key:'city', label:'🏙 Город',
+    skyTop:'#8fd3f4', skyBot:'#e8f6ff',
+    grass:'#c9cdd1', grassDark:'#aeb3b8',
+    track:'#8b9096', trackDark:'#6f747a' },
 ];
 function hexToRgb(hex){
   hex = hex.replace('#','');
@@ -917,7 +915,6 @@ function update(dt){
 
     bg.track -= effSpeed*dt;
     bg.stands -= effSpeed*dt*0.35;
-    bg.clouds -= effSpeed*dt*0.12;
   } else if(screenState==='stumble'){
     stumbleTimer -= dt;
     shakeTime = Math.max(0, shakeTime-dt);
@@ -1125,63 +1122,39 @@ function enterGameOver(){
 }
 
 /* ---------- drawing ---------- */
+function drawZoneImageLayer(zoneKey, alpha){
+  const entry = ZONE_BG_IMAGES[zoneKey];
+  if(!entry || !entry.ready) return false;
+  const destH = GROUND_Y;
+  const destW = entry.w * (destH / entry.h);
+  let offset = (-bg.stands) % destW;
+  if(offset < 0) offset += destW;
+  ctx.globalAlpha = alpha;
+  let x = -offset;
+  while(x < W){
+    ctx.drawImage(entry.img, x, 0, destW, destH);
+    x += destW;
+  }
+  ctx.globalAlpha = 1;
+  return true;
+}
+
 function drawBackground(){
   const {a:zoneA, b:zoneB, blend} = getZoneState();
   const zc = key => blend<=0 ? zoneA[key] : lerpColor(zoneA[key], zoneB[key], blend);
-  const outdoorFactor = zoneA.outdoor===zoneB.outdoor ? (zoneA.outdoor?1:0) : (zoneA.outdoor ? 1-blend : blend);
 
-  // sky
-  const grad = ctx.createLinearGradient(0,0,0,GROUND_Y);
-  grad.addColorStop(0, zc('skyTop'));
-  grad.addColorStop(1, zc('skyBot'));
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,W,GROUND_Y);
-
-  // sun + clouds fade out indoors, gym windows fade in instead
-  if(outdoorFactor>0.02){
-    ctx.globalAlpha = outdoorFactor;
-    const sunGlow = ctx.createRadialGradient(W-60,40,0,W-60,40,42);
-    sunGlow.addColorStop(0,'rgba(255,246,190,0.9)');
-    sunGlow.addColorStop(0.5,'rgba(255,242,176,0.35)');
-    sunGlow.addColorStop(1,'rgba(255,242,176,0)');
-    ctx.fillStyle = sunGlow;
-    ctx.beginPath(); ctx.arc(W-60,40,42,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff2b0';
-    ctx.beginPath(); ctx.arc(W-60, 40, 20, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    for(let i=0;i<4;i++){
-      const cx = ((i*160 + bg.clouds*0.5) % (W+120)) - 60;
-      drawCloud(cx, 30 + (i%2)*22);
-    }
-    ctx.globalAlpha = 1;
+  const drewA = drawZoneImageLayer(zoneA.key, 1);
+  if(!drewA){
+    // fallback flat sky gradient if a background image hasn't loaded yet
+    const grad = ctx.createLinearGradient(0,0,0,GROUND_Y);
+    grad.addColorStop(0, zc('skyTop'));
+    grad.addColorStop(1, zc('skyBot'));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,GROUND_Y);
   }
-  if(outdoorFactor<0.98){
-    ctx.globalAlpha = 1-outdoorFactor;
-    for(let i=0;i<3;i++){
-      const wx = 50 + i*150;
-      block(wx, 16, 54, 36, 'rgba(255,255,255,0.55)', 5);
-      ctx.strokeStyle = 'rgba(140,155,172,0.65)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(wx+27,16); ctx.lineTo(wx+27,52);
-      ctx.moveTo(wx,34); ctx.lineTo(wx+54,34);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
+  if(blend>0){
+    drawZoneImageLayer(zoneB.key, blend);
   }
-
-  // stands / treeline / gym wall (mid parallax)
-  const standY = 78;
-  ctx.fillStyle = zc('bandColor');
-  ctx.fillRect(0, standY, W, 34);
-  for(let i=0;i<26;i++){
-    const sx = ((i*22 + bg.stands) % (W+44)) - 22;
-    const c1 = zoneA.bandDots[i%zoneA.bandDots.length];
-    const c2 = zoneB.bandDots[i%zoneB.bandDots.length];
-    block(sx, standY+6, 10, 8, blend<=0 ? c1 : lerpColor(c1,c2,blend), 3);
-  }
-  ctx.fillStyle = zc('bandTrim');
-  ctx.fillRect(0, standY-6, W, 6);
 
   // grass / floor strip
   ctx.fillStyle = zc('grass');
@@ -1206,14 +1179,6 @@ function drawBackground(){
     block(dx, GROUND_Y+30, dashW, 4, '#fff', 2);
   }
 }
-function drawCloud(x,y){
-  ctx.beginPath();
-  ctx.ellipse(x,y,16,8,0,0,Math.PI*2);
-  ctx.ellipse(x+12,y-4,12,8,0,0,Math.PI*2);
-  ctx.ellipse(x-12,y-2,10,7,0,0,Math.PI*2);
-  ctx.fill();
-}
-
 function drawHint(cx, y, dir){
   ctx.fillStyle = dir==='up' ? '#ffffff' : '#ffe066';
   ctx.strokeStyle = '#1a1008';
@@ -1366,6 +1331,29 @@ function loadSprites(){
   return Promise.all(promises).then(()=>{ spritesReady = true; });
 }
 
+/* ---------- zone background panoramas (seamless ping-pong tiled) ---------- */
+const ZONE_BG_FILES = {
+  stadium: 'assets/backgrounds/stadium_bg.png',
+  park: 'assets/backgrounds/park_bg.png',
+  gym: 'assets/backgrounds/gym_bg.png',
+  city: 'assets/backgrounds/city_bg.png',
+};
+const ZONE_BG_IMAGES = {};
+function loadZoneBackgrounds(){
+  const promises = [];
+  for(const key in ZONE_BG_FILES){
+    const img = new Image();
+    const entry = {img, w:0, h:0, ready:false};
+    promises.push(new Promise(res=>{
+      img.onload = ()=>{ entry.w = img.naturalWidth; entry.h = img.naturalHeight; entry.ready = true; res(); };
+      img.onerror = res;
+    }));
+    img.src = ZONE_BG_FILES[key];
+    ZONE_BG_IMAGES[key] = entry;
+  }
+  return Promise.all(promises);
+}
+
 let duckPoseT = 0;
 
 function drawTiger(cx, groundScreenY, state, animT, footY, skins){
@@ -1500,6 +1488,7 @@ function loop(ts){
 }
 requestAnimationFrame(loop);
 loadSprites();
+loadZoneBackgrounds();
 
 /* ---------- HUD ---------- */
 const hudEl = document.getElementById('hud');
