@@ -853,7 +853,7 @@ function update(dt){
     if(spawnTimer<=0){
       spawnObstacle();
       const difficulty = Math.min(1, t/50);
-      spawnTimer = rand(1.35 - 0.55*difficulty, 2.1 - 0.6*difficulty) * stageDifficultyMult();
+      spawnTimer = rand(1.35 - 0.55*difficulty, 2.1 - 0.6*difficulty);
     }
     starSpawnTimer -= dt;
     if(starSpawnTimer<=0){
@@ -1619,10 +1619,6 @@ const STAGE_ROMAN = ['I','II','III','IV','V','VI','VII'];
 function stageThresholds(stage){
   const add = (Math.min(stage, MAX_STAGE)-1)*STAGE_STEP;
   return {bronze:STAGE_BASE.bronze+add, silver:STAGE_BASE.silver+add, gold:STAGE_BASE.gold+add};
-}
-function stageDifficultyMult(){
-  const s = Math.min(save.medalStage, MAX_STAGE);
-  return 1 - 0.25*(s-1)/(MAX_STAGE-1);
 }
 function getMedal(dist, stage){
   const th = stageThresholds(stage);
