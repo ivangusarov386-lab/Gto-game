@@ -163,6 +163,86 @@
     text-align:center;
   }
   .skinWrap{position:relative;margin-bottom:1.7em;}
+  #eventRow{
+    display:flex;
+    gap:1.4vmin;
+    margin:0.6em 0 1em;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .eventCard{
+    background:linear-gradient(#fff2d0,#f0d9a8);
+    border:3px solid var(--panel-border);
+    border-radius:14px;
+    padding:0.7em 0.9em;
+    cursor:pointer;
+    min-width:100px;
+    text-align:center;
+    transition:transform 0.08s ease;
+  }
+  .eventCard:active{transform:translateY(2px);}
+  .eventCard .eIcon{font-size:clamp(24px,5vmin,34px);display:block;}
+  .eventCard .eLabel{font-weight:700;font-size:clamp(10px,1.9vmin,13px);color:#5c3a1a;margin-top:0.25em;}
+  .eventCard .eBest{font-size:clamp(9px,1.5vmin,11px);color:#7a5a35;margin-top:0.1em;}
+  .meterWrap{
+    width:80%;
+    max-width:340px;
+    margin-bottom:1.2em;
+  }
+  .meterTrack{
+    position:relative;
+    width:100%;
+    height:clamp(20px,4vmin,32px);
+    background:rgba(255,255,255,0.85);
+    border:3px solid var(--panel-border);
+    border-radius:999px;
+    overflow:hidden;
+  }
+  .meterFill{
+    position:absolute;
+    top:0;left:0;bottom:0;
+    width:0%;
+    background:linear-gradient(90deg,#f2b705,#e2402c);
+  }
+  .meterMarker{
+    position:absolute;
+    top:-4px;bottom:-4px;
+    width:6px;
+    background:#1a1008;
+    border-radius:3px;
+    left:0%;
+    box-shadow:0 0 4px rgba(0,0,0,0.6);
+  }
+  #pushZoneHighlight{
+    position:absolute;
+    top:0;bottom:0;
+    left:0;
+    width:18%;
+    background:rgba(76,196,64,0.55);
+  }
+  #pushupsStats{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:0.4em;
+    margin-bottom:1em;
+    color:#fff;
+    text-shadow:1px 1px 2px rgba(0,0,0,0.6);
+    font-weight:700;
+    font-size:clamp(12px,2.4vmin,18px);
+  }
+  #staminaTrack{
+    width:min(60vw,200px);
+    height:10px;
+    background:rgba(255,255,255,0.3);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  #staminaFill{
+    height:100%;
+    width:100%;
+    background:linear-gradient(90deg,#4caf50,#8bc34a);
+  }
   #hud{
     position:absolute;
     top:clamp(40px,9vmin,56px);left:0;right:0;
@@ -359,20 +439,70 @@
     <button id="duckBtn" class="hidden">⬇<br>ПРИСЕСТЬ</button>
     <button id="jumpBtn" class="hidden">⬆<br>ПРЫЖОК</button>
 
-    <div id="menuScreen" class="overlay">
+    <div id="hubScreen" class="overlay">
       <div class="panel">
         <h1 class="title">🐯 Тигр-Спортсмен</h1>
-        <p class="subtitle">Помоги тигру сдать нормативы ГТО!</p>
-        <div>
-          <button class="btn" id="startBtn">СТАРТ</button>
-        </div>
-        <p class="hint" id="bestLine"></p>
+        <p class="subtitle">Выбери норматив ГТО!</p>
+        <div id="eventRow"></div>
         <div id="skinRow"></div>
         <p class="hint">Улучшения за звёзды:</p>
         <div id="perkRow"></div>
+      </div>
+    </div>
+
+    <div id="runIntroScreen" class="overlay hidden">
+      <div class="panel">
+        <h1 class="title">🏃 Бег</h1>
+        <p class="hint" id="runBestLine"></p>
         <p class="hint">Кнопка ⬆ справа — прыжок через барьер и лужу&nbsp;&nbsp;·&nbsp;&nbsp;кнопка ⬇ слева — присесть под перекладину</p>
         <p class="hint">Лови бонусы: 🛡️ щит от удара · 🧲 магнит звёзд · ⚡ ускорение</p>
+        <div class="rowGap" style="margin-top:0.8em;">
+          <button class="btn" id="runStartBtn">СТАРТ</button>
+          <button class="btn secondary" id="runBackBtn">Назад</button>
+        </div>
       </div>
+    </div>
+
+    <div id="jumpIntroScreen" class="overlay hidden">
+      <div class="panel">
+        <h1 class="title">🦘 Прыжок в длину</h1>
+        <p class="hint" id="jumpBestLine"></p>
+        <p class="hint">Шкала силы бежит туда-сюда — нажми кнопку в нужный момент, чтобы прыгнуть как можно дальше!</p>
+        <div class="rowGap" style="margin-top:0.8em;">
+          <button class="btn" id="jumpStartBtn">СТАРТ</button>
+          <button class="btn secondary" id="jumpBackBtn">Назад</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="jumpPlayScreen" class="overlay hidden">
+      <div class="meterWrap">
+        <div id="jumpMeterTrack" class="meterTrack"><div id="jumpMeterFill" class="meterFill"></div><div id="jumpMeterMarker" class="meterMarker"></div></div>
+      </div>
+      <button class="btn" id="jumpActionBtn">ПРЫГНУТЬ!</button>
+    </div>
+
+    <div id="pushupsIntroScreen" class="overlay hidden">
+      <div class="panel">
+        <h1 class="title">💪 Отжимания</h1>
+        <p class="hint" id="pushupsBestLine"></p>
+        <p class="hint">Тигр отжимается по кругу — жми кнопку точно в подсвеченной зоне внизу, чтобы засчиталось чистое повторение!</p>
+        <div class="rowGap" style="margin-top:0.8em;">
+          <button class="btn" id="pushupsStartBtn">СТАРТ</button>
+          <button class="btn secondary" id="pushupsBackBtn">Назад</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="pushupsPlayScreen" class="overlay hidden">
+      <div id="pushupsStats">
+        <div id="pushupsReps">Повторений: 0</div>
+        <div id="staminaTrack"><div id="staminaFill"></div></div>
+      </div>
+      <div class="meterWrap">
+        <div id="pushMeterTrack" class="meterTrack"><div id="pushZoneHighlight"></div><div id="pushMeterMarker" class="meterMarker"></div></div>
+      </div>
+      <button class="btn" id="pushupsActionBtn">ВНИЗ!</button>
     </div>
 
     <div id="gameOverScreen" class="overlay hidden">
@@ -454,7 +584,9 @@ function defaultSave(){
     medalStage:1,
     unlocked:{headband:false, cap:false, sneakers:false},
     equipped:{headband:false, cap:false, sneakers:false},
-    perks:{startShield:false, magnetPlus:false, boostPlus:false}
+    perks:{startShield:false, magnetPlus:false, boostPlus:false},
+    eventBest:{jump:0, pushups:0},
+    eventStage:{jump:1, pushups:1}
   };
 }
 let save = loadSave();
@@ -1096,7 +1228,7 @@ function enterGameOver(){
   save.bestDistance = Math.max(save.bestDistance, dist);
   save.bestScore = Math.max(save.bestScore, score);
   const stage = save.medalStage;
-  const medal = getMedal(dist, stage);
+  const medal = getMedal('run', dist, stage);
   let stageUp = false;
   if(medal.key==='gold' && stage < MAX_STAGE){
     save.medalStage = stage+1;
@@ -1474,9 +1606,19 @@ function loop(ts){
   let dt = (ts-lastTs)/1000;
   lastTs = ts;
   dt = Math.min(dt, 0.05);
-  update(dt);
-  render();
-  updateHud();
+  if(currentEvent==='run'){
+    update(dt);
+    render();
+    updateHud();
+  } else if(currentEvent==='jump'){
+    updateJump(dt);
+    renderJump();
+  } else if(currentEvent==='pushups'){
+    updatePushups(dt);
+    renderPushups();
+  } else {
+    render(); // idle tiger + background behind the hub/intro screens (screenState='menu')
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -1530,15 +1672,25 @@ function updateHud(){
 }
 
 /* ---------- screens ---------- */
-const menuScreen = document.getElementById('menuScreen');
+const hubScreen = document.getElementById('hubScreen');
+const runIntroScreen = document.getElementById('runIntroScreen');
+const jumpIntroScreen = document.getElementById('jumpIntroScreen');
+const jumpPlayScreen = document.getElementById('jumpPlayScreen');
+const pushupsIntroScreen = document.getElementById('pushupsIntroScreen');
+const pushupsPlayScreen = document.getElementById('pushupsPlayScreen');
 const gameOverScreen = document.getElementById('gameOverScreen');
-const startBtn = document.getElementById('startBtn');
+const ALL_SCREENS = [hubScreen, runIntroScreen, jumpIntroScreen, jumpPlayScreen, pushupsIntroScreen, pushupsPlayScreen, gameOverScreen];
+function showOnly(...screens){
+  ALL_SCREENS.forEach(s=> s.classList.add('hidden'));
+  screens.forEach(s=> s.classList.remove('hidden'));
+}
 const retryBtn = document.getElementById('retryBtn');
 const menuBtn = document.getElementById('menuBtn');
-const bestLine = document.getElementById('bestLine');
+const eventRow = document.getElementById('eventRow');
 const skinRow = document.getElementById('skinRow');
 const perkRow = document.getElementById('perkRow');
 const toastEl = document.getElementById('toast');
+let currentEvent = 'run';
 
 function renderSkinRow(){
   skinRow.innerHTML = '';
@@ -1602,40 +1754,122 @@ function renderPerkRow(){
   });
 }
 
-function showMenu(){
+function getEventBest(key){
+  return key==='run' ? save.bestDistance : save.eventBest[key];
+}
+function getEventStage(key){
+  return key==='run' ? save.medalStage : save.eventStage[key];
+}
+function hideRunHud(){
+  hudEl.classList.add('hidden');
+  duckBtn.classList.add('hidden');
+  jumpBtn.classList.add('hidden');
+  hudCombo.classList.add('hidden');
+  hudEffects.classList.add('hidden');
+}
+function renderEventRow(){
+  eventRow.innerHTML = '';
+  Object.values(EVENTS).forEach(ev=>{
+    const card = document.createElement('div');
+    card.className = 'eventCard';
+    const best = getEventBest(ev.key);
+    const stage = getEventStage(ev.key);
+    card.innerHTML = '<span class="eIcon">'+ev.icon+'</span>'+
+      '<div class="eLabel">'+ev.label+'</div>'+
+      '<div class="eBest">'+(best>0 ? best+' '+ev.unit : '—')+' · '+STAGE_ROMAN[stage-1]+'</div>';
+    card.addEventListener('click', ()=>{
+      Snd.ensureCtx(); Snd.click();
+      openEventIntro(ev.key);
+    });
+    eventRow.appendChild(card);
+  });
+}
+function showHub(){
+  currentEvent = null;
   screenState = 'menu';
-  gameOverScreen.classList.add('hidden');
-  menuScreen.classList.remove('hidden');
-  const stageLabel = 'Ступень: '+STAGE_ROMAN[save.medalStage-1];
-  bestLine.textContent = save.bestDistance>0 ? ('Лучший результат: '+save.bestDistance+' м  ·  '+stageLabel) : stageLabel;
+  distancePx = 0;
+  obstacles = []; stars = []; powerups = []; particles = [];
+  player.footY = 0; player.vy = 0; player.grounded = true; player.state = 'idle';
+  stumbleTimer = 0; shakeTime = 0; dustTimer = 0; landSquashT = 0; hitFlash = 0; comboFlashT = 0;
+  hideRunHud();
+  Snd.stopMusic();
+  showOnly(hubScreen);
+  renderEventRow();
   renderSkinRow();
   renderPerkRow();
 }
+function openEventIntro(key){
+  if(key==='run'){
+    const stageLabel = 'Ступень: '+STAGE_ROMAN[save.medalStage-1];
+    document.getElementById('runBestLine').textContent = save.bestDistance>0 ? ('Лучший результат: '+save.bestDistance+' м  ·  '+stageLabel) : stageLabel;
+    showOnly(runIntroScreen);
+  } else if(key==='jump'){
+    const stageLabel = 'Ступень: '+STAGE_ROMAN[save.eventStage.jump-1];
+    document.getElementById('jumpBestLine').textContent = save.eventBest.jump>0 ? ('Лучший результат: '+save.eventBest.jump+' см  ·  '+stageLabel) : stageLabel;
+    showOnly(jumpIntroScreen);
+  } else if(key==='pushups'){
+    const stageLabel = 'Ступень: '+STAGE_ROMAN[save.eventStage.pushups-1];
+    document.getElementById('pushupsBestLine').textContent = save.eventBest.pushups>0 ? ('Лучший результат: '+save.eventBest.pushups+' раз  ·  '+stageLabel) : stageLabel;
+    showOnly(pushupsIntroScreen);
+  }
+}
 
-const STAGE_BASE = {bronze:600, silver:800, gold:1100};
-const STAGE_STEP = 100;
 const MAX_STAGE = 7;
 const STAGE_ROMAN = ['I','II','III','IV','V','VI','VII'];
-function stageThresholds(stage){
-  const add = (Math.min(stage, MAX_STAGE)-1)*STAGE_STEP;
-  return {bronze:STAGE_BASE.bronze+add, silver:STAGE_BASE.silver+add, gold:STAGE_BASE.gold+add};
+const EVENTS = {
+  run: {
+    key:'run', label:'Бег', icon:'🏃', unit:'м', verb:'Дистанция',
+    base:{bronze:600, silver:800, gold:1100}, step:100,
+    phrase:{
+      gold:'Золотой значок ГТО! Ты — чемпион стадиона!',
+      silver:'Серебряный значок! Ещё чуть-чуть до золота!',
+      bronze:'Бронзовый значок! Отличное начало!',
+      none:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'
+    }
+  },
+  jump: {
+    key:'jump', label:'Прыжок в длину', icon:'🦘', unit:'см', verb:'Дальность',
+    base:{bronze:140, silver:160, gold:180}, step:10,
+    phrase:{
+      gold:'Золотой значок ГТО! Прыжок чемпиона!',
+      silver:'Серебряный значок! Совсем чуть-чуть до золота!',
+      bronze:'Бронзовый значок! Хороший прыжок!',
+      none:'Прыжок засчитан! Попробуй ещё раз — получится дальше!'
+    }
+  },
+  pushups: {
+    key:'pushups', label:'Отжимания', icon:'💪', unit:'раз', verb:'Повторений',
+    base:{bronze:10, silver:20, gold:30}, step:3,
+    phrase:{
+      gold:'Золотой значок ГТО! Железная выносливость!',
+      silver:'Серебряный значок! Ещё немного до золота!',
+      bronze:'Бронзовый значок! Хорошая попытка!',
+      none:'Отжимания засчитаны! Попробуй ещё раз — станет больше!'
+    }
+  },
+};
+function stageThresholds(eventKey, stage){
+  const ev = EVENTS[eventKey];
+  const add = (Math.min(stage, MAX_STAGE)-1)*ev.step;
+  return {bronze:ev.base.bronze+add, silver:ev.base.silver+add, gold:ev.base.gold+add};
 }
-function getMedal(dist, stage){
-  const th = stageThresholds(stage);
-  if(dist>=th.gold) return {key:'gold', icon:'🥇', phrase:'Золотой значок ГТО! Ты — чемпион стадиона!'};
-  if(dist>=th.silver) return {key:'silver', icon:'🥈', phrase:'Серебряный значок! Ещё чуть-чуть до золота!'};
-  if(dist>=th.bronze) return {key:'bronze', icon:'🥉', phrase:'Бронзовый значок! Отличное начало!'};
-  return {key:'none', icon:'🐯', phrase:'Ты пробежал дистанцию! Попробуй ещё раз — станет лучше!'};
+function getMedal(eventKey, value, stage){
+  const ev = EVENTS[eventKey];
+  const th = stageThresholds(eventKey, stage);
+  if(value>=th.gold) return {key:'gold', icon:'🥇', phrase:ev.phrase.gold};
+  if(value>=th.silver) return {key:'silver', icon:'🥈', phrase:ev.phrase.silver};
+  if(value>=th.bronze) return {key:'bronze', icon:'🥉', phrase:ev.phrase.bronze};
+  return {key:'none', icon:'🐯', phrase:ev.phrase.none};
 }
-function getNextMedalGap(dist, stage){
-  const th = stageThresholds(stage);
+function getNextMedalGap(eventKey, value, stage){
+  const th = stageThresholds(eventKey, stage);
   const tiers = [
     {min:th.bronze, label:'Бронзы'},
     {min:th.silver, label:'Серебра'},
     {min:th.gold, label:'Золота'},
   ];
   for(const t of tiers){
-    if(dist < t.min) return {label:t.label, gap:t.min-dist};
+    if(value < t.min) return {label:t.label, gap:t.min-value};
   }
   return null;
 }
@@ -1647,57 +1881,336 @@ function showToast(text){
   showToast._t = setTimeout(()=> toastEl.classList.remove('show'), 2600);
 }
 
-function showGameOverScreen(dist, unlockedNow, stage, stageUp){
-  const medal = getMedal(dist, stage);
+function fillResultCommon(eventKey, value, stage){
+  const ev = EVENTS[eventKey];
+  const medal = getMedal(eventKey, value, stage);
   const badge = document.getElementById('medalBadge');
   badge.className = 'medalBadge ' + medal.key;
   badge.textContent = medal.icon;
   document.getElementById('resultPhrase').textContent = medal.phrase;
-  document.getElementById('resultDistance').textContent = 'Дистанция: '+dist+' м  ·  Очки: '+score;
-  document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun+'  ·  Всего: '+save.totalStars+'⭐';
-  document.getElementById('resultBest').textContent = 'Рекорд: '+save.bestDistance+' м';
 
   const maxedOut = medal.key==='gold' && stage>=MAX_STAGE;
   document.getElementById('resultStage').textContent = 'Ступень: '+STAGE_ROMAN[stage-1]+(maxedOut ? ' (максимум!)' : '');
 
   const gapEl = document.getElementById('resultGap');
-  const gap = getNextMedalGap(dist, stage);
+  const gap = getNextMedalGap(eventKey, value, stage);
   if(gap){
-    gapEl.textContent = 'Не хватило '+gap.gap+' м до '+gap.label+'!';
+    gapEl.textContent = 'Не хватило '+gap.gap+' '+ev.unit+' до '+gap.label+'!';
     gapEl.classList.remove('hidden');
   } else {
     gapEl.classList.add('hidden');
   }
-
-  gameOverScreen.classList.remove('hidden');
+  return medal;
+}
+function announceResultToast(stageUp, newStage, unlockedNow){
   if(stageUp){
-    showToast('🎉 Открыта ступень '+STAGE_ROMAN[save.medalStage-1]+'!');
+    showToast('🎉 Открыта ступень '+STAGE_ROMAN[newStage-1]+'!');
   } else if(unlockedNow.length){
     showToast('Новый аксессуар: '+unlockedNow.join(', ')+'!');
   }
 }
 
-startBtn.addEventListener('click', ()=>{
-  Snd.ensureCtx(); Snd.click();
-  menuScreen.classList.add('hidden');
+function showGameOverScreen(dist, unlockedNow, stage, stageUp){
+  fillResultCommon('run', dist, stage);
+  document.getElementById('resultDistance').textContent = 'Дистанция: '+dist+' м  ·  Очки: '+score;
+  document.getElementById('resultStars').textContent = 'Собрано звёзд: '+starsThisRun+'  ·  Всего: '+save.totalStars+'⭐';
+  document.getElementById('resultBest').textContent = 'Рекорд: '+save.bestDistance+' м';
+  showOnly(gameOverScreen);
+  announceResultToast(stageUp, save.medalStage, unlockedNow);
+}
+
+function showJumpResultScreen(dist, unlockedNow, stage, stageUp){
+  fillResultCommon('jump', dist, stage);
+  document.getElementById('resultDistance').textContent = 'Дальность: '+dist+' см';
+  document.getElementById('resultStars').textContent = 'Всего звёзд: '+save.totalStars+'⭐';
+  document.getElementById('resultBest').textContent = 'Рекорд: '+save.eventBest.jump+' см';
+  showOnly(gameOverScreen);
+  announceResultToast(stageUp, save.eventStage.jump, unlockedNow);
+}
+
+function showPushupsResultScreen(reps, unlockedNow, stage, stageUp){
+  fillResultCommon('pushups', reps, stage);
+  document.getElementById('resultDistance').textContent = 'Повторений: '+reps;
+  document.getElementById('resultStars').textContent = 'Всего звёзд: '+save.totalStars+'⭐';
+  document.getElementById('resultBest').textContent = 'Рекорд: '+save.eventBest.pushups+' раз';
+  showOnly(gameOverScreen);
+  announceResultToast(stageUp, save.eventStage.pushups, unlockedNow);
+}
+
+/* ---------- long jump event ---------- */
+function pingpong(t){
+  const m = ((t % 2) + 2) % 2;
+  return m <= 1 ? m : 2 - m;
+}
+const JUMP_CHARGE_HALF_PERIOD = 0.55;
+const jumpMeterFill = document.getElementById('jumpMeterFill');
+const jumpMeterMarker = document.getElementById('jumpMeterMarker');
+let jumpState = 'charging'; // charging | crouch | flight
+let jumpChargeT = 0;
+let jumpPower = 0;
+let jumpPhaseTimer = 0;
+let jumpFlightT = 0;
+let jumpFlightDur = 0;
+let jumpDx = 0;
+let jumpResultCm = 0;
+
+function resetJump(){
+  screenState = 'playing';
+  jumpState = 'charging';
+  jumpChargeT = 0;
+  jumpPower = 0;
+  jumpPhaseTimer = 0;
+  jumpDx = 0;
+  player.footY = 0;
+  player.vy = 0;
+  player.grounded = true;
+  player.state = 'idle';
+  player.animT = 0;
+}
+function startJump(){
+  currentEvent = 'jump';
+  hideRunHud();
+  showOnly(jumpPlayScreen);
+  resetJump();
+}
+function jumpAction(){
+  if(jumpState!=='charging') return;
+  Snd.ensureCtx();
+  jumpPower = pingpong(jumpChargeT / JUMP_CHARGE_HALF_PERIOD);
+  jumpState = 'crouch';
+  jumpPhaseTimer = 0;
+  player.state = 'duck';
+  duckPoseT = 0;
+  Snd.duck();
+}
+function updateJump(dt){
+  if(screenState==='gameover') return;
+  if(jumpState==='charging'){
+    jumpChargeT += dt;
+    player.animT += dt;
+  } else if(jumpState==='crouch'){
+    jumpPhaseTimer += dt;
+    if(jumpPhaseTimer>=0.28){
+      jumpState = 'flight';
+      jumpFlightT = 0;
+      const vy0 = JUMP_VY * (0.6 + 0.4*jumpPower);
+      player.vy = vy0;
+      player.grounded = false;
+      player.state = 'jump';
+      jumpFlightDur = 2*(-vy0)/GRAVITY;
+      jumpResultCm = Math.max(20, Math.round(60 + jumpPower*200 + rand(-6,6)));
+      Snd.jump();
+    }
+  } else if(jumpState==='flight'){
+    jumpFlightT += dt;
+    player.vy += GRAVITY*dt;
+    player.footY -= player.vy*dt;
+    const progress = jumpFlightDur>0 ? Math.min(1, jumpFlightT/jumpFlightDur) : 1;
+    jumpDx = 70*jumpPower*Math.sin(progress*Math.PI*0.5);
+    if(player.footY<=0){
+      player.footY = 0;
+      player.vy = 0;
+      player.grounded = true;
+      player.state = 'idle';
+      Snd.land();
+      finishJump(jumpResultCm);
+    }
+  }
+}
+function renderJump(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  const skins = {headband: save.equipped.headband, cap: save.equipped.cap};
+  drawTiger(PLAYER_X + jumpDx, GROUND_Y, player.state, player.animT, player.footY, skins);
+
+  if(jumpState==='charging'){
+    const pct = Math.round(pingpong(jumpChargeT / JUMP_CHARGE_HALF_PERIOD)*100);
+    jumpMeterFill.style.width = pct+'%';
+    jumpMeterMarker.style.left = pct+'%';
+  }
+}
+function finishJump(distCm){
+  screenState = 'gameover';
+  save.eventBest.jump = Math.max(save.eventBest.jump, distCm);
+  const stage = save.eventStage.jump;
+  const medal = getMedal('jump', distCm, stage);
+  let stageUp = false;
+  if(medal.key==='gold' && stage < MAX_STAGE){
+    save.eventStage.jump = stage+1;
+    stageUp = true;
+  }
+  const unlockedNow = tryUnlockAll();
+  persist();
+  if(stageUp || unlockedNow.length) Snd.unlock();
+  showJumpResultScreen(distCm, unlockedNow, stage, stageUp);
+}
+
+/* ---------- push-ups event ---------- */
+const PUSH_BASE_PERIOD = 1.3;
+const PUSH_MIN_PERIOD = 0.65;
+const PUSH_BASE_ZONE = 0.22;
+const PUSH_MIN_ZONE = 0.08;
+const PUSH_TIME_LIMIT = 30;
+const pushMeterMarker = document.getElementById('pushMeterMarker');
+const pushZoneHighlight = document.getElementById('pushZoneHighlight');
+const pushupsRepsEl = document.getElementById('pushupsReps');
+const staminaFill = document.getElementById('staminaFill');
+let pushCycleT = 0;
+let pushPhase = 0;
+let pushReps = 0;
+let pushStamina = 1;
+let pushTimeLeft = PUSH_TIME_LIMIT;
+let pushInZoneCooldown = false;
+let pushFlashT = 0;
+
+function resetPushups(){
+  screenState = 'playing';
+  pushCycleT = 0;
+  pushPhase = 0;
+  pushReps = 0;
+  pushStamina = 1;
+  pushTimeLeft = PUSH_TIME_LIMIT;
+  pushInZoneCooldown = false;
+  pushFlashT = 0;
+  player.footY = 0;
+  player.state = 'duck';
+  duckPoseT = 1; // start on the "up" pose read
+  player.animT = 0;
+}
+function startPushups(){
+  currentEvent = 'pushups';
+  hideRunHud();
+  showOnly(pushupsPlayScreen);
+  resetPushups();
+}
+function pushZoneWidth(){
+  return PUSH_MIN_ZONE + (PUSH_BASE_ZONE-PUSH_MIN_ZONE)*pushStamina;
+}
+function pushCyclePeriod(){
+  return Math.max(PUSH_MIN_PERIOD, PUSH_BASE_PERIOD - pushReps*0.02);
+}
+function pushupsAction(){
+  if(screenState==='gameover') return;
+  Snd.ensureCtx();
+  if(pushPhase <= pushZoneWidth() && !pushInZoneCooldown){
+    pushReps++;
+    pushStamina = Math.max(0.12, pushStamina - 0.035);
+    pushInZoneCooldown = true;
+    pushFlashT = 0.18;
+    Snd.star();
+  } else {
+    pushFlashT = -0.18; // negative marks a miss-flash
+    Snd.click();
+  }
+}
+function updatePushups(dt){
+  if(screenState==='gameover') return;
+  pushTimeLeft -= dt;
+  if(pushTimeLeft<=0){
+    finishPushups(pushReps);
+    return;
+  }
+  pushCycleT += dt;
+  pushPhase = pingpong(pushCycleT / (pushCyclePeriod()/2));
+  if(pushPhase > pushZoneWidth()+0.05) pushInZoneCooldown = false;
+  player.state = pushPhase < 0.5 ? 'duck' : 'idle';
+  duckPoseT = pushPhase < 0.5 ? 0.2 : 1;
+  player.animT += dt;
+  if(pushFlashT>0) pushFlashT = Math.max(0, pushFlashT-dt);
+  else if(pushFlashT<0) pushFlashT = Math.min(0, pushFlashT+dt);
+
+  pushupsRepsEl.textContent = 'Повторений: '+pushReps;
+  staminaFill.style.width = Math.round(pushStamina*100)+'%';
+  pushMeterMarker.style.left = Math.round(pushPhase*100)+'%';
+  pushZoneHighlight.style.width = Math.round(pushZoneWidth()*100)+'%';
+}
+function renderPushups(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  const skins = {headband: save.equipped.headband, cap: save.equipped.cap};
+  drawTiger(PLAYER_X, GROUND_Y, player.state, player.animT, player.footY, skins);
+  if(pushFlashT!==0){
+    ctx.fillStyle = pushFlashT>0 ? 'rgba(120,255,120,0.25)' : 'rgba(255,80,80,0.25)';
+    ctx.fillRect(0,0,W,H);
+  }
+}
+function finishPushups(reps){
+  screenState = 'gameover';
+  save.eventBest.pushups = Math.max(save.eventBest.pushups, reps);
+  const stage = save.eventStage.pushups;
+  const medal = getMedal('pushups', reps, stage);
+  let stageUp = false;
+  if(medal.key==='gold' && stage < MAX_STAGE){
+    save.eventStage.pushups = stage+1;
+    stageUp = true;
+  }
+  const unlockedNow = tryUnlockAll();
+  persist();
+  if(stageUp || unlockedNow.length) Snd.unlock();
+  showPushupsResultScreen(reps, unlockedNow, stage, stageUp);
+}
+
+function startRun(){
+  currentEvent = 'run';
+  showOnly();
   resetRun();
   screenState = 'playing';
   Snd.startMusic();
+}
+document.getElementById('runStartBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.ensureCtx(); Snd.click();
+  startRun();
 });
+document.getElementById('runBackBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.click();
+  showHub();
+});
+
+document.getElementById('jumpStartBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.ensureCtx(); Snd.click();
+  startJump();
+});
+document.getElementById('jumpBackBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.click();
+  showHub();
+});
+document.getElementById('jumpActionBtn').addEventListener('pointerdown', e=>{
+  e.preventDefault(); e.stopPropagation();
+  jumpAction();
+});
+
+document.getElementById('pushupsStartBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.ensureCtx(); Snd.click();
+  startPushups();
+});
+document.getElementById('pushupsBackBtn').addEventListener('click', e=>{
+  e.stopPropagation();
+  Snd.click();
+  showHub();
+});
+document.getElementById('pushupsActionBtn').addEventListener('pointerdown', e=>{
+  e.preventDefault(); e.stopPropagation();
+  pushupsAction();
+});
+
 retryBtn.addEventListener('click', ()=>{
   Snd.click();
-  gameOverScreen.classList.add('hidden');
-  resetRun();
-  screenState = 'playing';
-  Snd.startMusic();
+  if(currentEvent==='run') startRun();
+  else if(currentEvent==='jump') startJump();
+  else if(currentEvent==='pushups') startPushups();
 });
 menuBtn.addEventListener('click', ()=>{
   Snd.click();
   Snd.stopMusic();
-  showMenu();
+  showHub();
 });
 
-showMenu();
+showHub();
 })();
 </script>
 </body>
